@@ -81,3 +81,21 @@ body {
   color: hsl(var(--foreground));
   font-family: var(--font-sans);
 }
+
+@keyframes id-scan-sweep {
+  0% {
+    top: 0%;
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    top: calc(100% - 4px);
+    opacity: 0.6;
+  }
+}
+
+.id-scan-line {
+  animation: id-scan-sweep 1.8s ease-in-out infinite;
+}

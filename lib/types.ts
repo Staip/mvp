@@ -28,6 +28,7 @@ export type ProcessStep = {
   openingHours?: string
   /** Office slot length in minutes — defined per process step, not chosen by user */
   appointmentDurationMinutes?: number
+  uploadVariant?: "id_card_two_sided"
 }
 
 /** @deprecated Legacy flat location — normalized into steps */

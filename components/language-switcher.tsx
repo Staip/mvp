@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { Check, ChevronDown, Languages } from "lucide-react"
+import { Check, ChevronDown } from "lucide-react"
 
 import { useLocale } from "@/components/locale-provider"
 import { Button } from "@/components/ui/button"
@@ -130,7 +130,6 @@ export function LanguageSwitcher({ className }: { className?: string }) {
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
-        <Languages className="size-3.5 text-muted-foreground" />
         <span aria-hidden>{LOCALE_FLAGS[locale]}</span>
         <span>{LOCALE_LABELS[locale]}</span>
         <ChevronDown

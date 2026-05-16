@@ -1,4 +1,5 @@
 import type { Locale } from "@/lib/i18n"
+import { prependIdScanStep } from "@/lib/id-scan-step"
 import type {
   ProcessDocument,
   ProcessGuide,
@@ -45,18 +46,22 @@ const DEFAULT_QUESTIONS: Record<
 > = {
   en: () => [
     { id: "fullName", label: "Your full name", placeholder: "e.g. Ana Horvat" },
+    { id: "oib", label: "OIB (personal ID number)", placeholder: "11 digits" },
     { id: "address", label: "Your address in Split", placeholder: "Street and city" },
   ],
   hr: () => [
     { id: "fullName", label: "Ime i prezime", placeholder: "npr. Ana Horvat" },
+    { id: "oib", label: "OIB", placeholder: "11 znamenki" },
     { id: "address", label: "Adresa u Splitu", placeholder: "Ulica i grad" },
   ],
   de: () => [
     { id: "fullName", label: "Vollständiger Name", placeholder: "z. B. Ana Horvat" },
+    { id: "oib", label: "OIB", placeholder: "11 Ziffern" },
     { id: "address", label: "Adresse in Split", placeholder: "Straße und Ort" },
   ],
   it: () => [
     { id: "fullName", label: "Nome completo", placeholder: "es. Ana Horvat" },
+    { id: "oib", label: "OIB", placeholder: "11 cifre" },
     { id: "address", label: "Indirizzo a Spalato", placeholder: "Via e città" },
   ],
 }
@@ -229,5 +234,5 @@ export function normalizeProcessGuide(
   })
 
   const { documents: _d, locations: _l, ...rest } = guide
-  return { ...rest, steps }
+  return prependIdScanStep({ ...rest, steps }, locale)
 }

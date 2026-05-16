@@ -5,8 +5,9 @@ import { createPortal } from "react-dom"
 import {
   Bell,
   CalendarDays,
-  ChevronRight,
   FolderOpen,
+  MoreVertical,
+  Trash2,
 } from "lucide-react"
 
 import { useLocale } from "@/components/locale-provider"
@@ -17,6 +18,83 @@ import { processProgress } from "@/lib/user-data/storage"
 import { cn } from "@/lib/utils"
 
 type Panel = "processes" | "notifications" | "appointments" | null
+
+const MENU_MARGIN = 12
+const MENU_MAX_WIDTH = 360
+
+function HubItemMenu({
+  itemId,
+  openId,
+  onOpenChange,
+  onDelete,
+  actionsLabel,
+  deleteLabel,
+}: {
+  itemId: string
+  openId: string | null
+  onOpenChange: (id: string | null) => void
+  onDelete: () => void
+  actionsLabel: string
+  deleteLabel: string
+}) {
+  const open = openId === itemId
+
+  return (
+    <div className="relative shrink-0 self-center">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        className="text-muted-foreground size-8 shrink-0"
+        aria-label={actionsLabel}
+        aria-expanded={open}
+        onClick={(e) => {
+          e.stopPropagation()
+          onOpenChange(open ? null : itemId)
+        }}
+      >
+        <MoreVertical className="size-4" />
+      </Button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute top-full right-0 z-10 mt-0.5 min-w-[7.5rem] rounded-md border border-border bg-card py-1 shadow-lg"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            className="text-destructive hover:bg-muted flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm"
+            onClick={(e) => {
+              e.stopPropagation()
+              onDelete()
+              onOpenChange(null)
+            }}
+          >
+            <Trash2 className="size-3.5" />
+            {deleteLabel}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function computeMenuStyle(rect: DOMRect) {
+  const width = Math.min(
+    MENU_MAX_WIDTH,
+    window.innerWidth - MENU_MARGIN * 2
+  )
+  // Prefer right edge aligned with trigger; clamp so panel stays on screen
+  let left = rect.right - width
+  left = Math.max(MENU_MARGIN, left)
+  left = Math.min(left, window.innerWidth - MENU_MARGIN - width)
+
+  return {
+    top: rect.bottom + 6,
+    left,
+    width,
+  }
+}
 
 export function HeaderHub() {
   const { t } = useLocale()
@@ -30,12 +108,16 @@ export function HeaderHub() {
     requestResume,
     markNotificationRead,
     markAllNotificationsRead,
+    deleteProcess,
+    deleteNotification,
+    deleteAppointment,
   } = useUserData()
 
   const [panel, setPanel] = useState<Panel>(null)
+  const [actionMenuId, setActionMenuId] = useState<string | null>(null)
   const [menuStyle, setMenuStyle] = useState<{
     top: number
-    right: number
+    left: number
     width: number
   }>()
   const containerRef = useRef<HTMLDivElement>(null)
@@ -46,22 +128,22 @@ export function HeaderHub() {
   function openPanel(name: Panel, key: string) {
     const el = triggerRefs.current[key]
     if (!el) return
-    const rect = el.getBoundingClientRect()
-    setMenuStyle({
-      top: rect.bottom + 6,
-      right: window.innerWidth - rect.right,
-      width: Math.min(360, window.innerWidth - 24),
-    })
+    setMenuStyle(computeMenuStyle(el.getBoundingClientRect()))
+    setActionMenuId(null)
     setPanel((p) => (p === name ? null : name))
   }
 
   useEffect(() => {
-    if (!panel) return
+    if (!panel) {
+      setActionMenuId(null)
+      return
+    }
     function close(e: PointerEvent) {
       const target = e.target as Node
       if (containerRef.current?.contains(target)) return
       if (document.getElementById("header-hub-menu")?.contains(target)) return
       setPanel(null)
+      setActionMenuId(null)
     }
     document.addEventListener("pointerdown", close)
     return () => document.removeEventListener("pointerdown", close)
@@ -73,7 +155,7 @@ export function HeaderHub() {
       style={{
         position: "fixed",
         top: menuStyle.top,
-        right: menuStyle.right,
+        left: menuStyle.left,
         width: menuStyle.width,
       }}
       className="z-[200] max-h-[min(24rem,70vh)] overflow-y-auto rounded-xl border border-border bg-card p-2 text-card-foreground shadow-xl"
@@ -91,25 +173,32 @@ export function HeaderHub() {
             openProcesses.map((p) => {
               const pct = processProgress(p.checked, p.guide.steps.length)
               return (
-                <button
+                <div
                   key={p.id}
-                  type="button"
-                  className="hover:bg-muted flex w-full items-center justify-between gap-2 rounded-lg px-2 py-2.5 text-left text-sm transition-colors"
-                  onClick={() => {
-                    requestResume(p.id)
-                    setPanel(null)
-                  }}
+                  className="hover:bg-muted flex items-center gap-0.5 rounded-lg py-0.5 pr-1 pl-2 transition-colors"
                 >
-                  <span className="min-w-0">
-                    <span className="block truncate font-medium">
-                      {p.guide.title}
-                    </span>
+                  <button
+                    type="button"
+                    className="flex min-w-0 flex-1 flex-col gap-0.5 py-2 pr-1 text-left text-sm"
+                    onClick={() => {
+                      requestResume(p.id)
+                      setPanel(null)
+                    }}
+                  >
+                    <span className="truncate font-medium">{p.guide.title}</span>
                     <span className="text-muted-foreground text-xs">
                       {pct}% · {h.continue}
                     </span>
-                  </span>
-                  <ChevronRight className="size-4 shrink-0 opacity-50" />
-                </button>
+                  </button>
+                  <HubItemMenu
+                    itemId={p.id}
+                    openId={actionMenuId}
+                    onOpenChange={setActionMenuId}
+                    onDelete={() => deleteProcess(p.id)}
+                    actionsLabel={h.itemActions}
+                    deleteLabel={h.delete}
+                  />
+                </div>
               )
             })
           )}
@@ -144,25 +233,37 @@ export function HeaderHub() {
             </p>
           ) : (
             notifications.map((n) => (
-              <button
+              <div
                 key={n.id}
-                type="button"
                 className={cn(
-                  "flex w-full flex-col gap-0.5 rounded-lg px-2 py-2.5 text-left text-sm transition-colors",
+                  "flex items-center gap-0.5 rounded-lg py-0.5 pr-1 pl-2 transition-colors",
                   n.read ? "opacity-70" : "bg-primary/5",
                   "hover:bg-muted"
                 )}
-                onClick={() => {
-                  markNotificationRead(n.id)
-                  if (n.processId) {
-                    requestResume(n.processId)
-                    setPanel(null)
-                  }
-                }}
               >
-                <span className="font-medium">{n.title}</span>
-                <span className="text-muted-foreground text-xs">{n.body}</span>
-              </button>
+                <button
+                  type="button"
+                  className="flex min-w-0 flex-1 flex-col gap-0.5 py-2 pr-1 text-left text-sm"
+                  onClick={() => {
+                    markNotificationRead(n.id)
+                    if (n.processId) {
+                      requestResume(n.processId)
+                      setPanel(null)
+                    }
+                  }}
+                >
+                  <span className="font-medium">{n.title}</span>
+                  <span className="text-muted-foreground text-xs">{n.body}</span>
+                </button>
+                <HubItemMenu
+                  itemId={n.id}
+                  openId={actionMenuId}
+                  onOpenChange={setActionMenuId}
+                  onDelete={() => deleteNotification(n.id)}
+                  actionsLabel={h.itemActions}
+                  deleteLabel={h.delete}
+                />
+              </div>
             ))
           )}
         </div>
@@ -181,16 +282,26 @@ export function HeaderHub() {
             appointments.map((a) => (
               <div
                 key={a.id}
-                className="rounded-lg border border-border/60 px-2 py-2.5 text-sm"
+                className="hover:bg-muted flex items-center gap-0.5 rounded-lg border border-border/60 py-0.5 pr-1 pl-2 transition-colors"
               >
-                <p className="font-medium">{a.processTitle}</p>
-                <p className="text-muted-foreground text-xs">{a.stepTitle}</p>
-                <p className="text-muted-foreground mt-1 text-xs">
-                  {a.officeName}
-                </p>
-                <p className="text-primary mt-1 text-xs font-medium">
-                  {a.date} · {a.time} ({a.intervalMinutes} min)
-                </p>
+                <div className="min-w-0 flex-1 py-2 pr-1 text-sm">
+                  <p className="font-medium">{a.processTitle}</p>
+                  <p className="text-muted-foreground text-xs">{a.stepTitle}</p>
+                  <p className="text-muted-foreground mt-1 text-xs">
+                    {a.officeName}
+                  </p>
+                  <p className="text-primary mt-1 text-xs font-medium">
+                    {a.date} · {a.time} ({a.intervalMinutes} min)
+                  </p>
+                </div>
+                <HubItemMenu
+                  itemId={a.id}
+                  openId={actionMenuId}
+                  onOpenChange={setActionMenuId}
+                  onDelete={() => deleteAppointment(a.id)}
+                  actionsLabel={h.itemActions}
+                  deleteLabel={h.delete}
+                />
               </div>
             ))
           )}

@@ -46,6 +46,8 @@ export type Messages = {
     continue: string
     completedNote: string
     markAllRead: string
+    itemActions: string
+    delete: string
   }
   copilot: {
     heroTitle: string
@@ -123,6 +125,19 @@ export type Messages = {
       bookingDemoNote: string
       view: string
       mapIframeTitle: string
+      idStepFront: string
+      idStepBack: string
+      idUploadFront: string
+      idUploadBack: string
+      idScanning: string
+      idExtracted: string
+      idContinueBack: string
+      idComplete: string
+      idRetake: string
+      autofillFromId: string
+      downloadPdf: string
+      generatingPdf: string
+      completeIdScanFirst: string
     }
   }
   api: {

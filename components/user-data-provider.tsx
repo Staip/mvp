@@ -59,6 +59,8 @@ type UserDataContextValue = {
   markNotificationRead: (id: string) => void
   markAllNotificationsRead: () => void
   deleteProcess: (id: string) => void
+  deleteNotification: (id: string) => void
+  deleteAppointment: (id: string) => void
 }
 
 const UserDataContext = createContext<UserDataContextValue | null>(null)
@@ -190,7 +192,12 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
       deleteProcess: (id: string) => {
         setProcesses((prev) => prev.filter((p) => p.id !== id))
         if (activeProcessId === id) setActiveProcessId(null)
+        if (resumeProcessId === id) setResumeProcessId(null)
       },
+      deleteNotification: (id: string) =>
+        setNotifications((prev) => prev.filter((n) => n.id !== id)),
+      deleteAppointment: (id: string) =>
+        setAppointments((prev) => prev.filter((a) => a.id !== id)),
     }),
     [
       ready,

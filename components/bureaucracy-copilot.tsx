@@ -29,6 +29,7 @@ import { HelpChatButton } from "@/components/contextual-help/help-chat-button"
 import { GuideStepList } from "@/components/guide-step-list"
 import { useUserData } from "@/components/user-data-provider"
 import { VoiceInputButton } from "@/components/voice-input-button"
+import { clearDemoExtracted } from "@/lib/demo/demo-storage"
 import { normalizeProcessGuide } from "@/lib/normalize-guide"
 import type { ProcessGuide } from "@/lib/types"
 
@@ -102,6 +103,7 @@ export function BureaucracyCopilot() {
       return
     }
 
+    clearDemoExtracted()
     setError(null)
     setRequest(q)
     setPhase("loading")
@@ -136,6 +138,7 @@ export function BureaucracyCopilot() {
   }
 
   const reset = useCallback(() => {
+    clearDemoExtracted()
     setPhase("input")
     setGuide(null)
     setChecked({})

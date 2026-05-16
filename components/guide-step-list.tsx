@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import {
   CheckCircle2,
   ChevronDown,
@@ -10,6 +10,8 @@ import {
   MapPin,
 } from "lucide-react"
 
+import { IdCardUploadPanel } from "@/components/demo/id-card-upload-panel"
+import { isIdScanStep } from "@/lib/id-scan-step"
 import { HelpChatButton } from "@/components/contextual-help/help-chat-button"
 import { StepDocumentPanel } from "@/components/step-document-panel"
 import { StepUploadPanel } from "@/components/step-upload-panel"
@@ -17,6 +19,7 @@ import { StepVisitPanel } from "@/components/step-visit-panel"
 import { Button } from "@/components/ui/button"
 import type { Messages } from "@/lib/i18n"
 import type { ProcessGuide, ProcessStep, StepKind } from "@/lib/types"
+import { isDemoIdScanComplete } from "@/lib/demo/demo-storage"
 import { cn } from "@/lib/utils"
 
 type GuideStepListProps = {
@@ -47,7 +50,11 @@ export function GuideStepList({
     return idx === -1 ? guide.steps.length : idx
   }, [guide.steps, checked])
 
-  const [activeStepId, setActiveStepId] = useState<string | null>(null)
+  const [activeStepId, setActiveStepId] = useState<string | null>(
+    () => guide.steps[0]?.id ?? null
+  )
+  const [, setScanTick] = useState(0)
+  const onIdScanUpdate = useCallback(() => setScanTick((n) => n + 1), [])
 
   function completeStep(step: ProcessStep) {
     onCheckedChange(step.id, true)
@@ -58,6 +65,16 @@ export function GuideStepList({
   function renderStepPanel(step: ProcessStep) {
     switch (step.kind) {
       case "upload":
+        if (isIdScanStep(step)) {
+          return (
+            <IdCardUploadPanel
+              step={step}
+              labels={labels}
+              processTitle={guide.title}
+              onScanUpdate={onIdScanUpdate}
+            />
+          )
+        }
         return (
           <StepUploadPanel
             step={step}
@@ -206,6 +223,7 @@ export function GuideStepList({
                   type="button"
                   size="lg"
                   className="w-full gap-2 bg-emerald-600 hover:bg-emerald-600/90"
+                  disabled={isIdScanStep(step) && !isDemoIdScanComplete()}
                   onClick={() => completeStep(step)}
                 >
                   <CheckCircle2 className="size-5" />
