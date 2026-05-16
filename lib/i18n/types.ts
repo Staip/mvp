@@ -52,11 +52,22 @@ export type Messages = {
       allDone: string
       checklistTitle: string
       checklistDesc: string
-      documentsTitle: string
-      documentsNote: string
+      stepCurrent: string
+      stepDone: string
+      stepLocked: string
+      completeStep: string
+      documentsForStep: string
+      location: string
+      openingHours: string
+      bookAppointment: string
+      selectDate: string
+      selectTime: string
+      interval15: string
+      interval30: string
+      confirmBooking: string
+      bookingConfirmed: string
+      bookingDemoNote: string
       view: string
-      mapTitle: string
-      mapDesc: string
       mapIframeTitle: string
     }
   }

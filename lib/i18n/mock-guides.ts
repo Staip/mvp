@@ -1,9 +1,24 @@
-import type { ProcessGuide } from "@/lib/types"
+import { normalizeProcessGuide } from "@/lib/normalize-guide"
+import type {
+  ProcessDocument,
+  ProcessGuide,
+  ProcessLocation,
+} from "@/lib/types"
 import type { Locale } from "./types"
 
 type Scenario = "car" | "business" | "generic"
 
-const CAR: Record<Locale, ProcessGuide> = {
+type MockGuideInput = {
+  title: string
+  summary: string
+  estimatedDuration: string
+  estimatedCost: string
+  steps: Array<{ id: string; title: string; description: string }>
+  documents: ProcessDocument[]
+  locations: ProcessLocation[]
+}
+
+const CAR: Record<Locale, MockGuideInput> = {
   en: {
     title: "Vehicle registration in Split",
     summary:
@@ -110,7 +125,7 @@ const CAR: Record<Locale, ProcessGuide> = {
   },
 }
 
-const BUSINESS: Record<Locale, ProcessGuide> = {
+const BUSINESS: Record<Locale, MockGuideInput> = {
   en: {
     title: "Starting a small business in Split",
     summary: "Open obrt or d.o.o. via HGK Split and FINA. Typical for cafés, services, and freelancers.",
@@ -213,10 +228,7 @@ const BUSINESS: Record<Locale, ProcessGuide> = {
   },
 }
 
-const GENERIC: Record<
-  Locale,
-  (request: string) => ProcessGuide
-> = {
+const GENERIC: Record<Locale, (request: string) => MockGuideInput> = {
   en: (request) => ({
     title: "Administrative process in Split",
     summary: `Guide for: "${request.slice(0, 120)}". Typical steps for public administration in Split-Dalmatia County.`,
@@ -328,7 +340,9 @@ export function getMockProcessGuide(
   locale: Locale
 ): ProcessGuide {
   const scenario = detectScenario(request)
-  if (scenario === "car") return CAR[locale]
-  if (scenario === "business") return BUSINESS[locale]
-  return GENERIC[locale](request)
+  let raw: MockGuideInput
+  if (scenario === "car") raw = CAR[locale]
+  else if (scenario === "business") raw = BUSINESS[locale]
+  else raw = GENERIC[locale](request)
+  return normalizeProcessGuide(raw, locale)
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { LOCALE_AI_NAMES, getMessages, isLocale } from "@/lib/i18n"
 import { getMockProcessGuide } from "@/lib/i18n/mock-guides"
+import { normalizeProcessGuide } from "@/lib/normalize-guide"
 import type { Locale } from "@/lib/i18n"
 import type { ProcessGuide } from "@/lib/types"
 
@@ -19,33 +20,37 @@ const JSON_SCHEMA = {
           id: { type: "string" },
           title: { type: "string" },
           description: { type: "string" },
+          documents: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                name: { type: "string" },
+                note: { type: "string" },
+              },
+              required: ["name", "note"],
+              additionalProperties: false,
+            },
+          },
+          location: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              address: { type: "string" },
+            },
+            required: ["name", "address"],
+            additionalProperties: false,
+          },
+          openingHours: { type: "string" },
         },
-        required: ["id", "title", "description"],
-        additionalProperties: false,
-      },
-    },
-    documents: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          name: { type: "string" },
-          note: { type: "string" },
-        },
-        required: ["name", "note"],
-        additionalProperties: false,
-      },
-    },
-    locations: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          name: { type: "string" },
-          address: { type: "string" },
-          purpose: { type: "string" },
-        },
-        required: ["name", "address", "purpose"],
+        required: [
+          "id",
+          "title",
+          "description",
+          "documents",
+          "location",
+          "openingHours",
+        ],
         additionalProperties: false,
       },
     },
@@ -56,8 +61,6 @@ const JSON_SCHEMA = {
     "estimatedDuration",
     "estimatedCost",
     "steps",
-    "documents",
-    "locations",
   ],
   additionalProperties: false,
 } as const
@@ -65,10 +68,10 @@ const JSON_SCHEMA = {
 function systemPrompt(locale: Locale): string {
   const lang = LOCALE_AI_NAMES[locale]
   return `You are SplitFlow, an AI bureaucracy copilot for Split, Croatia.
-Given a citizen's request, produce an accurate, practical step-by-step guide for Croatian/Split public administration.
-Use real office types (Police Administration, City of Split, HGK, FINA, Tax Administration) with plausible Split addresses.
-Be concise but helpful. Steps must be actionable. Documents must be realistic.
-IMPORTANT: Write ALL text fields (title, summary, steps, documents, locations) in ${lang}.
+Given a citizen's request, produce an accurate step-by-step guide for Croatian/Split public administration.
+Each step MUST include: title, description, documents needed for THAT step only, location (office name + Split address), and openingHours (e.g. Mon–Fri 08:00–16:00).
+Use real office types (Police Administration, City of Split, HGK, FINA, Tax Administration).
+Write ALL text in ${lang}.
 Respond ONLY with valid JSON matching the schema.`
 }
 
@@ -148,6 +151,8 @@ export async function POST(req: Request) {
       guide = getMockProcessGuide(request, locale)
       source = "mock"
     }
+
+    guide = normalizeProcessGuide(guide, locale)
 
     return NextResponse.json({ guide, source })
   } catch {
