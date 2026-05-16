@@ -1,0 +1,118 @@
+You are working on a 9-hour AI Hackathon MVP.
+
+PRIMARY GOAL:
+Build a working, polished, demo-ready product as fast as possible.
+Optimize for speed, clarity, and presentation quality over perfect architecture.
+
+---
+
+TECH STACK (MUST FOLLOW):
+- Next.js (App Router)
+- TypeScript
+- Tailwind CSS
+- shadcn/ui components
+- Supabase (database, auth, storage)
+- Vercel deployment compatible
+- OpenAI API (only if needed for AI features)
+
+---
+
+ARCHITECTURE RULES:
+
+1. KEEP IT SIMPLE
+- No overengineering
+- No unnecessary abstraction layers
+- No microservices
+- No complex folder structures
+
+2. USE SUPABASE DIRECTLY
+- Use Supabase client directly in components or server components
+- Avoid building custom backend unless absolutely necessary
+- No Express / no custom servers
+
+3. NEXT.JS BEST PRACTICES
+- Prefer Server Components when possible
+- Use Client Components only when needed (state, interactivity)
+- Keep routing simple and flat
+- Use /app directory structure only
+
+4. DATABASE RULES (SUPABASE)
+- Use simple relational tables
+- Avoid complex schema design
+- Assume fast iteration > perfect normalization
+- Use anon key only in frontend
+
+5. UI/UX PRIORITY
+- UI must look modern and polished
+- Use shadcn/ui components wherever possible
+- Mobile-first responsive design required
+- Clean spacing, good typography, minimal clutter
+- Add loading states and empty states always
+
+6. AI USAGE (if applicable)
+- AI features must be simple and visible in UI
+- Prefer single-step AI calls over complex pipelines
+- Optimize for "wow effect" in demo
+
+---
+
+CODE QUALITY RULES:
+
+- Prefer readable code over clever code
+- Prefer duplication over premature abstraction
+- Keep functions small but not over-split
+- Avoid unnecessary design patterns
+- Always prioritize "working first, perfect later"
+
+---
+
+DEMO-FIRST THINKING:
+
+Everything must support a strong 1-minute demo:
+
+- Clear user flow
+- Immediate visual feedback
+- Obvious value within 5 seconds of use
+- No hidden features or complex onboarding
+
+---
+
+WHAT TO AVOID:
+
+- Docker
+- Kubernetes
+- Complex backend architecture
+- Excessive folder structure
+- Overuse of React Context
+- Unnecessary state management libraries
+- Premature optimization
+- Enterprise patterns
+
+---
+
+DEPLOYMENT RULES:
+
+- Must be deployable on Vercel without modifications
+- Must work with environment variables only
+- No local-only assumptions
+- Avoid filesystem dependencies
+
+---
+
+PRODUCT MINDSET:
+
+This is not a coding exercise.
+This is a product demo competition.
+
+Every feature must answer:
+"Does this make the demo more impressive in under 60 seconds?"
+
+If not, remove it.
+
+---
+
+FINAL PRINCIPLE:
+
+Simplicity wins hackathons.
+Speed beats complexity.
+Demo quality beats code quality.
