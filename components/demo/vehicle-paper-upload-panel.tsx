@@ -8,22 +8,24 @@ import { IdScanOverlay } from "@/components/demo/id-scan-overlay"
 import { HelpChatButton } from "@/components/contextual-help/help-chat-button"
 import { useLocale } from "@/components/locale-provider"
 import { Button } from "@/components/ui/button"
+import { saveUploadSnapshot } from "@/lib/application-data-storage"
+import { snapshotFromUploadStep } from "@/lib/build-registration-packet"
 import {
-  DEMO_FRONT_FIELDS,
-  fieldLabel,
-  getDemoFallbackFields,
-} from "@/lib/demo/demo-fields"
-import { isDemoIdScanComplete, mergeDemoFields } from "@/lib/demo/demo-storage"
-import { maskSensitiveFieldValue } from "@/lib/privacy-mask"
+  VEHICLE_PAPER_FIELDS,
+  getVehiclePaperFallback,
+  pickVehiclePaperFields,
+  vehicleFieldLabel,
+} from "@/lib/demo/vehicle-paper-fields"
+import { saveVehiclePaperExtracted } from "@/lib/demo/vehicle-paper-storage"
 import type { Messages } from "@/lib/i18n"
 import type { ProcessStep } from "@/lib/types"
 
 const MIN_SCAN_MS = 2400
 
-type IdCardUploadPanelProps = {
+type VehiclePaperUploadPanelProps = {
+  processId: string
   step: ProcessStep
   labels: Messages["copilot"]["guide"]
-  processTitle: string
   onScanUpdate?: () => void
 }
 
@@ -31,11 +33,12 @@ function delay(ms: number) {
   return new Promise((r) => setTimeout(r, ms))
 }
 
-export function IdCardUploadPanel({
+export function VehiclePaperUploadPanel({
+  processId,
   step,
   labels,
   onScanUpdate,
-}: IdCardUploadPanelProps) {
+}: VehiclePaperUploadPanelProps) {
   const { locale } = useLocale()
   const inputRef = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState<string | null>(null)
@@ -44,7 +47,7 @@ export function IdCardUploadPanel({
   const [revealedFields, setRevealedFields] = useState<
     Array<{ key: string; label: string; value: string }>
   >([])
-  const [scanDone, setScanDone] = useState(false)
+  const [done, setDone] = useState(false)
   const doc = step.document!
 
   async function extractFromImage(dataUrl: string) {
@@ -55,13 +58,13 @@ export function IdCardUploadPanel({
         image: dataUrl,
         documentName: doc.name,
         locale,
-        side: "front",
+        context: "vehicle_papers",
       }),
     })
     const data = await res.json()
     if (!res.ok) throw new Error(data.error ?? labels.uploadFailed)
-    const fallback = getDemoFallbackFields("front", locale)
-    return { ...fallback, ...(data.fields ?? {}) }
+    const fallback = getVehiclePaperFallback(locale)
+    return pickVehiclePaperFields({ ...fallback, ...(data.fields ?? {}) })
   }
 
   async function handleFile(file: File) {
@@ -85,21 +88,19 @@ export function IdCardUploadPanel({
             delay(MIN_SCAN_MS),
           ])
 
-          const rows = DEMO_FRONT_FIELDS.filter((def) => fields[def.key]).map(
+          const rows = VEHICLE_PAPER_FIELDS.filter((def) => fields[def.key]).map(
             (def) => ({
               key: def.key,
-              label: fieldLabel(def, locale),
-              value: maskSensitiveFieldValue(
-                def.key,
-                String(fields[def.key])
-              ),
+              label: vehicleFieldLabel(def, locale),
+              value: String(fields[def.key]),
             })
           )
 
-          mergeDemoFields(fields)
-          onScanUpdate?.()
+          saveUploadSnapshot(processId, snapshotFromUploadStep(step, fields))
+          saveVehiclePaperExtracted(fields)
           setRevealedFields(rows)
-          setScanDone(true)
+          setDone(true)
+          onScanUpdate?.()
         } catch (e) {
           setError(e instanceof Error ? e.message : labels.uploadFailed)
           setPreview(null)
@@ -110,8 +111,6 @@ export function IdCardUploadPanel({
     }
     reader.readAsDataURL(file)
   }
-
-  const allDone = isDemoIdScanComplete() || scanDone
 
   return (
     <div className="space-y-4">
@@ -134,7 +133,7 @@ export function IdCardUploadPanel({
         }}
       />
 
-      {!allDone && !preview && (
+      {!done && !preview && (
         <Button
           type="button"
           variant="outline"
@@ -143,8 +142,7 @@ export function IdCardUploadPanel({
           disabled={scanning}
         >
           <Camera className="size-8 text-primary" />
-          <span className="font-medium">{labels.idUploadFront}</span>
-          <span className="text-muted-foreground text-xs">{labels.idStepFront}</span>
+          <span className="font-medium">{labels.uploadPhoto}</span>
         </Button>
       )}
 
@@ -166,11 +164,11 @@ export function IdCardUploadPanel({
               onClick={() => {
                 setPreview(null)
                 setRevealedFields([])
-                setScanDone(false)
+                setDone(false)
                 if (inputRef.current) inputRef.current.value = ""
               }}
             >
-              {labels.idRetake}
+              {labels.uploadAgain}
             </Button>
           )}
         </div>
@@ -178,15 +176,15 @@ export function IdCardUploadPanel({
 
       {revealedFields.length > 0 && !scanning && (
         <ExtractedFieldsReveal
-          title={labels.idExtracted}
+          title={labels.vehicleExtracted}
           fields={revealedFields}
         />
       )}
 
-      {allDone && (
+      {done && (
         <div className="flex items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-3 text-sm text-emerald-800 dark:text-emerald-200">
           <CheckCircle2 className="size-5 shrink-0" />
-          {labels.idComplete}
+          {labels.vehicleComplete}
         </div>
       )}
 

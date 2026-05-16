@@ -177,6 +177,17 @@ export const de: Messages = {
       idExtracted: "Erkannte Felder",
       idContinueBack: "Jetzt Rückseite scannen",
       idComplete: "ID bestätigt — Formulare werden ausgefüllt",
+      vehicleExtracted: "Fahrzeugdaten erkannt",
+      vehicleComplete: "Fahrzeugpapiere gescannt — weiter zum nächsten Schritt",
+      vehiclePdfIntro:
+        "Ihre Ausweis- und Fahrzeugdaten werden zum offiziellen Antrag zusammengefasst. Hier ansehen und für den Termin ausdrucken.",
+      previewRegistrationPdf: "PDF-Vorschau",
+      printRegistrationPdf: "PDF drucken",
+      pdfPreviewTitle: "Vorschau Anmeldungspaket",
+      closePdfPreview: "Schließen",
+      vehiclePdfReady: "PDF geprüft — Schritt abschließen und Termin buchen.",
+      completeVehicleScansFirst:
+        "Zuerst Ausweis (Schritt 1) und Fahrzeugpapiere (Schritt 2) scannen.",
       idRetake: "Foto wiederholen",
       autofillFromId: "Automatisch aus ID-Scan ausgefüllt",
       downloadPdf: "PDF-Antrag herunterladen",

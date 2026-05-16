@@ -68,9 +68,18 @@ export function downloadApplicationPdf(
   })
 }
 
-export function downloadRegistrationPacket(input: RegistrationPacketPdfInput) {
+export type BuildPacketHtmlOptions = {
+  /** When true, opens browser print dialog on load (download flow). */
+  autoPrint?: boolean
+}
+
+export function buildRegistrationPacketHtml(
+  input: RegistrationPacketPdfInput,
+  options: BuildPacketHtmlOptions = {}
+): string {
   const { processTitle, referenceNumber, submittedAt, sections, footer, locale } =
     input
+  const { autoPrint = false } = options
 
   const sectionsHtml = sections
     .map((sec) => {
@@ -291,11 +300,20 @@ export function downloadRegistrationPacket(input: RegistrationPacketPdfInput) {
 
     <p class="footer">${escapeHtml(footer)} · SplitFlow demo · ${escapeHtml(referenceNumber)}</p>
   </div>
-  <script>window.onload=function(){setTimeout(function(){window.print()},400)}</script>
+  ${autoPrint ? `<script>window.onload=function(){setTimeout(function(){window.print()},400)}</script>` : ""}
 </body>
 </html>`
 
-  const safeName = processTitle
+  return html
+}
+
+export function printRegistrationPacketHtml(html: string, filename: string) {
+  openPrintHtml(html, filename)
+}
+
+export function downloadRegistrationPacket(input: RegistrationPacketPdfInput) {
+  const html = buildRegistrationPacketHtml(input, { autoPrint: true })
+  const safeName = input.processTitle
     .replace(/[^\w\s-]/g, "")
     .replace(/\s+/g, "-")
     .slice(0, 40)

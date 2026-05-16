@@ -3,10 +3,11 @@ import {
   getDemoFallbackFields,
   getVehicleDemoFallback,
 } from "@/lib/demo/demo-fields"
+import { getVehiclePaperFallback } from "@/lib/demo/vehicle-paper-fields"
 import { LOCALE_AI_NAMES, isLocale } from "@/lib/i18n"
 import type { Locale } from "@/lib/i18n"
 
-type ExtractMode = "id_front" | "id_back" | "vehicle"
+type ExtractMode = "id_front" | "id_back" | "vehicle" | "vehicle_papers"
 
 function isVehicleDocument(name: string) {
   return /insurance|osigur|technical|pregled|vehicle|vozil|registration|promet|invoice|račun|racun|car|auto|vin|homolog|polic|certifikat|potvrda/i.test(
@@ -16,8 +17,10 @@ function isVehicleDocument(name: string) {
 
 function resolveMode(
   side: "front" | "back" | undefined,
-  documentName: string
+  documentName: string,
+  context?: string
 ): ExtractMode {
+  if (context === "vehicle_papers") return "vehicle_papers"
   if (side === "back") return "id_back"
   if (side === "front") return "id_front"
   if (isVehicleDocument(documentName)) return "vehicle"
@@ -36,6 +39,18 @@ function schemaForMode(mode: ExtractMode) {
         issuedBy: { type: "string" },
       },
       required: ["oib", "address", "issueDate", "expiryDate", "issuedBy"],
+      additionalProperties: false,
+    }
+  }
+  if (mode === "vehicle_papers") {
+    return {
+      type: "object",
+      properties: {
+        vin: { type: "string" },
+        fuelType: { type: "string" },
+        vehicleMass: { type: "string" },
+      },
+      required: ["vin", "fuelType", "vehicleMass"],
       additionalProperties: false,
     }
   }
@@ -85,6 +100,7 @@ function schemaForMode(mode: ExtractMode) {
 const MODE_KEYS: Record<ExtractMode, readonly string[]> = {
   id_front: ["fullName", "dateOfBirth", "idCardNumber", "nationality"],
   id_back: ["oib", "address", "issueDate", "expiryDate", "issuedBy"],
+  vehicle_papers: ["vin", "fuelType", "vehicleMass"],
   vehicle: [
     "vin",
     "make",
@@ -112,12 +128,16 @@ function pickFields(
 }
 
 function fallbackForMode(mode: ExtractMode, locale: Locale) {
+  if (mode === "vehicle_papers") return getVehiclePaperFallback(locale)
   if (mode === "vehicle") return getVehicleDemoFallback(locale)
   if (mode === "id_back") return getDemoFallbackFields("back", locale)
   return getDemoFallbackFields("front", locale)
 }
 
 function systemPrompt(mode: ExtractMode, lang: string, documentName: string) {
+  if (mode === "vehicle_papers") {
+    return `You extract text from Croatian vehicle registration papers (prometna dozvola / technical record) for Split administration. Document: ${documentName}. ${lang}. Return JSON keys only: vin (chassis/VIN), fuelType (petrol/diesel/LPG etc.), vehicleMass (kerb mass in kg as digits). Use empty string if not visible.`
+  }
   if (mode === "vehicle") {
     return `You extract text from vehicle-related documents (registration card, insurance policy, technical inspection) for Croatian administration in Split. Document: ${documentName}. Return JSON with visible fields only; empty string if missing. Language context: ${lang}. Keys: vin, make, model, year, color, registrationNumber, engineNumber, fuelType, insurancePolicy, insuranceValidUntil.`
   }
@@ -140,7 +160,9 @@ export async function POST(req: Request) {
       typeof body.documentName === "string" ? body.documentName : "Document"
     side =
       body.side === "front" || body.side === "back" ? body.side : undefined
-    mode = resolveMode(side, documentName)
+    const context =
+      typeof body.context === "string" ? body.context : undefined
+    mode = resolveMode(side, documentName, context)
 
     if (typeof body.locale === "string" && isLocale(body.locale)) {
       locale = body.locale

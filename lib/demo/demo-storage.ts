@@ -1,9 +1,12 @@
 const KEY = "splitflow-demo-extracted"
 
+import { DEMO_FRONT_FIELDS } from "@/lib/demo/demo-fields"
+
+const FRONT_KEYS = new Set(DEMO_FRONT_FIELDS.map((f) => f.key))
+
 export type DemoExtractedData = {
   fields: Record<string, string>
   frontDone: boolean
-  backDone: boolean
 }
 
 export function loadDemoExtracted(): DemoExtractedData | null {
@@ -11,7 +14,11 @@ export function loadDemoExtracted(): DemoExtractedData | null {
   try {
     const raw = sessionStorage.getItem(KEY)
     if (!raw) return null
-    return JSON.parse(raw) as DemoExtractedData
+    const parsed = JSON.parse(raw) as DemoExtractedData & { backDone?: boolean }
+    return {
+      fields: parsed.fields ?? {},
+      frontDone: !!parsed.frontDone,
+    }
   } catch {
     return null
   }
@@ -22,19 +29,14 @@ export function saveDemoExtracted(data: DemoExtractedData) {
   sessionStorage.setItem(KEY, JSON.stringify(data))
 }
 
-export function mergeDemoFields(
-  partial: Record<string, string>,
-  side: "front" | "back"
-) {
-  const prev = loadDemoExtracted() ?? {
-    fields: {},
-    frontDone: false,
-    backDone: false,
+export function mergeDemoFields(partial: Record<string, string>) {
+  const frontOnly: Record<string, string> = {}
+  for (const [key, value] of Object.entries(partial)) {
+    if (FRONT_KEYS.has(key) && value?.trim()) frontOnly[key] = value.trim()
   }
   const next: DemoExtractedData = {
-    fields: { ...prev.fields, ...partial },
-    frontDone: side === "front" ? true : prev.frontDone,
-    backDone: side === "back" ? true : prev.backDone,
+    fields: frontOnly,
+    frontDone: true,
   }
   saveDemoExtracted(next)
   return next
@@ -47,5 +49,5 @@ export function clearDemoExtracted() {
 
 export function isDemoIdScanComplete() {
   const d = loadDemoExtracted()
-  return !!(d?.frontDone && d?.backDone)
+  return !!d?.frontDone
 }

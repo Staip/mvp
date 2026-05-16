@@ -177,6 +177,17 @@ export const hr: Messages = {
       idExtracted: "Prepoznata polja",
       idContinueBack: "Sada skenirajte stražnju stranu",
       idComplete: "ID potvrđen — obrasci se automatski popunjavaju",
+      vehicleExtracted: "Podaci o vozilu prepoznati",
+      vehicleComplete: "Prometna skenirana — nastavite na sljedeći korak",
+      vehiclePdfIntro:
+        "Podaci s osobne i prometne dozvole sastavljeni su u službeni PDF. Pregledajte ga ovdje, zatim ispišite za termin.",
+      previewRegistrationPdf: "Pregled PDF-a",
+      printRegistrationPdf: "Ispiši PDF",
+      pdfPreviewTitle: "Pregled zahtjeva za registraciju",
+      closePdfPreview: "Zatvori",
+      vehiclePdfReady: "PDF pregledan — možete završiti korak i rezervirati termin.",
+      completeVehicleScansFirst:
+        "Prvo dovršite sken osobne (korak 1) i prometne (korak 2).",
       idRetake: "Ponovi fotografiju",
       autofillFromId: "Automatski popunjeno iz skena ID-a",
       downloadPdf: "Preuzmi PDF zahtjev",

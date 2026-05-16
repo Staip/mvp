@@ -23,6 +23,7 @@ import { downloadTextDocument } from "@/lib/download-document"
 import { downloadApplicationPdf, downloadRegistrationPacket } from "@/lib/download-pdf"
 import { loadDemoExtracted } from "@/lib/demo/demo-storage"
 import { valueForQuestion } from "@/lib/map-extracted-fields"
+import { maskIdCardNumber } from "@/lib/privacy-mask"
 import type { Messages } from "@/lib/i18n"
 import type { ProcessGuide, ProcessStep } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -257,32 +258,40 @@ export function StepDocumentPanel({
       <p className="text-muted-foreground text-sm">{labels.questionsIntro}</p>
 
       <div className="space-y-3">
-        {questions.map((q) => (
-          <FieldLabelWithHelp
-            key={q.id}
-            label={q.label}
-            scope="document_field"
-            step={step}
-            field={{ id: q.id, label: q.label, placeholder: q.placeholder }}
-            documentName={doc.name}
-          >
-            <input
-              type="text"
-              value={answers[q.id] ?? ""}
-              onChange={(e) => {
-                setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
-                setHighlighted((prev) => ({ ...prev, [q.id]: false }))
-              }}
-              placeholder={q.placeholder}
-              disabled={!hasIdData}
-              className={cn(
-                "border-input bg-background focus-visible:ring-ring/50 h-9 w-full rounded-lg border px-3 text-sm transition-all duration-500 focus-visible:ring-3 focus-visible:outline-none disabled:opacity-60",
-                highlighted[q.id] &&
-                  "border-emerald-500/50 bg-emerald-500/10 ring-2 ring-emerald-500/25"
-              )}
-            />
-          </FieldLabelWithHelp>
-        ))}
+        {questions.map((q) => {
+          const raw = answers[q.id] ?? ""
+          const isMaskedId = q.id === "idCardNumber" && raw.length > 0
+          return (
+            <FieldLabelWithHelp
+              key={q.id}
+              label={q.label}
+              scope="document_field"
+              step={step}
+              field={{ id: q.id, label: q.label, placeholder: q.placeholder }}
+              documentName={doc.name}
+            >
+              <input
+                type="text"
+                value={isMaskedId ? maskIdCardNumber(raw) : raw}
+                readOnly={isMaskedId}
+                onChange={(e) => {
+                  if (isMaskedId) return
+                  setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
+                  setHighlighted((prev) => ({ ...prev, [q.id]: false }))
+                }}
+                placeholder={q.placeholder}
+                disabled={!hasIdData}
+                aria-label={q.label}
+                className={cn(
+                  "border-input bg-background focus-visible:ring-ring/50 h-9 w-full rounded-lg border px-3 text-sm transition-all duration-500 focus-visible:ring-3 focus-visible:outline-none disabled:opacity-60",
+                  highlighted[q.id] &&
+                    "border-emerald-500/50 bg-emerald-500/10 ring-2 ring-emerald-500/25",
+                  isMaskedId && "font-mono tracking-wide"
+                )}
+              />
+            </FieldLabelWithHelp>
+          )
+        })}
       </div>
 
       {needsUpload && (

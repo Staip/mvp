@@ -16,34 +16,34 @@ const COPY: Record<
   en: {
     title: "Scan your ID card",
     description:
-      "Required first step for every process. Upload the front, then the back — AI extracts your data for all forms below.",
+      "Required first step for every process. Upload the front of your ID — AI extracts your details for all forms below.",
     hint: "Hold the card flat, good lighting, all corners visible.",
     docName: "Croatian ID card",
-    docNote: "Front and back required",
+    docNote: "Front side only",
   },
   hr: {
-    title: "Skenirajte hrvatsku osobnu iskaznicu",
+    title: "Skenirajte osobnu iskaznicu",
     description:
-      "Obavezni prvi korak za svaki postupak. Prednja, zatim stražnja strana — AI popunjava sve obrasce ispod.",
+      "Obavezni prvi korak za svaki postupak. Učitajte prednju stranu osobne — AI popunjava podatke u obrascima ispod.",
     hint: "Držite iskaznicu ravno, dobro osvjetljenje, svi kutovi vidljivi.",
     docName: "Osobna iskaznica",
-    docNote: "Potrebna prednja i stražnja strana",
+    docNote: "Samo prednja strana",
   },
   de: {
-    title: "Kroatischen Ausweis scannen",
+    title: "Personalausweis scannen",
     description:
-      "Pflichtschritt für jedes Verfahren. Vorder- und Rückseite — die KI füllt alle Formulare aus.",
+      "Pflichtschritt für jedes Verfahren. Vorderseite hochladen — die KI füllt alle Formulare aus.",
     hint: "Karte flach halten, gute Beleuchtung.",
     docName: "Personalausweis",
-    docNote: "Vorder- und Rückseite",
+    docNote: "Nur Vorderseite",
   },
   it: {
-    title: "Scansiona carta d'identità croata",
+    title: "Scansiona la carta d'identità",
     description:
-      "Primo passo obbligatorio per ogni pratica. Fronte e retro — l'IA compila tutti i moduli.",
+      "Primo passo obbligatorio per ogni pratica. Carica il fronte della carta d'identità — l'IA compila i moduli.",
     hint: "Tieni la carta piatta, buona luce.",
     docName: "Carta d'identità",
-    docNote: "Fronte e retro richiesti",
+    docNote: "Solo fronte",
   },
 }
 

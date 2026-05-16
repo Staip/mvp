@@ -1,6 +1,12 @@
 import type { Locale } from "@/lib/i18n"
 import { mergeDocumentQuestions } from "@/lib/document-step-questions"
 import { isIdScanStep, prependIdScanStep } from "@/lib/id-scan-step"
+import {
+  applyVehiclePaperAsStepTwo,
+  finalizeVehicleRegistrationSteps,
+  isVehiclePaperStep,
+  isVehiclePdfStep,
+} from "@/lib/vehicle-paper-step"
 import type {
   ProcessDocument,
   ProcessGuide,
@@ -164,8 +170,12 @@ function mergeFormWithUpload(steps: ProcessStep[]): ProcessStep[] {
     if (
       step.kind === "document" &&
       !isIdScanStep(step) &&
+      !isVehiclePaperStep(step) &&
+      !isVehiclePdfStep(step) &&
       next?.kind === "upload" &&
-      !isIdScanStep(next)
+      !isIdScanStep(next) &&
+      !isVehiclePaperStep(next) &&
+      !isVehiclePdfStep(next)
     ) {
       out.push({
         ...step,
@@ -236,5 +246,17 @@ export function normalizeProcessGuide(
 
   const merged = mergeFormWithUpload(steps)
   const { documents: _d, locations: _l, ...rest } = guide
-  return prependIdScanStep({ ...rest, steps: merged }, locale)
+  const withId = prependIdScanStep({ ...rest, steps: merged }, locale)
+  const withVehicle = {
+    ...withId,
+    steps: applyVehiclePaperAsStepTwo(withId.steps, locale, withId),
+  }
+  return {
+    ...withVehicle,
+    steps: finalizeVehicleRegistrationSteps(
+      withVehicle.steps,
+      locale,
+      withVehicle
+    ),
+  }
 }

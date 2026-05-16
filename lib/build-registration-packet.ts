@@ -1,9 +1,8 @@
-import {
-  DEMO_BACK_FIELDS,
-  DEMO_FRONT_FIELDS,
-  fieldLabel,
-} from "@/lib/demo/demo-fields"
+import { DEMO_FRONT_FIELDS, fieldLabel } from "@/lib/demo/demo-fields"
+import { maskSensitiveFieldValue } from "@/lib/privacy-mask"
+import { PDF_EXCLUDED_QUESTION_IDS } from "@/lib/document-step-questions"
 import { loadDemoExtracted } from "@/lib/demo/demo-storage"
+import { loadVehiclePaperExtracted } from "@/lib/demo/vehicle-paper-storage"
 import {
   loadApplicationData,
   type StepDocumentSnapshot,
@@ -68,6 +67,12 @@ const UPLOAD_LABELS: Record<string, Record<Locale, string>> = {
     de: "Kraftstoff",
     it: "Carburante",
   },
+  vehicleMass: {
+    en: "Vehicle mass (kg)",
+    hr: "Masa vozila (kg)",
+    de: "Fahrzeugmasse (kg)",
+    it: "Massa del veicolo (kg)",
+  },
   firstRegistration: {
     en: "First registration date",
     hr: "Datum prve registracije",
@@ -99,9 +104,7 @@ function humanizeKey(key: string) {
 export function labelForField(key: string, locale: Locale): string {
   const fromUpload = UPLOAD_LABELS[key]?.[locale]
   if (fromUpload) return fromUpload
-  const fromId = [...DEMO_FRONT_FIELDS, ...DEMO_BACK_FIELDS].find(
-    (f) => f.key === key
-  )
+  const fromId = DEMO_FRONT_FIELDS.find((f) => f.key === key)
   if (fromId) return fieldLabel(fromId, locale)
   return humanizeKey(key)
 }
@@ -115,6 +118,27 @@ function rowsFromRecord(
     .map(([k, v]) => ({ label: labelForField(k, locale), value: v.trim() }))
 }
 
+function isExcludedFromPdf(questionId: string, label: string) {
+  if (PDF_EXCLUDED_QUESTION_IDS.has(questionId)) return true
+  const t = label.toLowerCase()
+  return /\boib\b|adresa|address|prebivalište/.test(t)
+}
+
+function idFrontRowsForPdf(
+  fields: Record<string, string>,
+  locale: Locale
+): Array<{ label: string; value: string }> {
+  return DEMO_FRONT_FIELDS.map((def) => {
+    const value = (fields[def.key] ?? "").trim()
+    return {
+      label: fieldLabel(def, locale),
+      value: value
+        ? maskSensitiveFieldValue(def.key, value)
+        : "",
+    }
+  }).filter((r) => r.value)
+}
+
 function documentRows(
   snap: StepDocumentSnapshot
 ): Array<{ label: string; value: string }> {
@@ -122,8 +146,13 @@ function documentRows(
     .map((q) => ({
       label: q.label,
       value: (snap.answers[q.id] ?? "").trim(),
+      id: q.id,
     }))
-    .filter((r) => r.value)
+    .filter((r) => r.value && !isExcludedFromPdf(r.id, r.label))
+    .map(({ id, label, value }) => ({
+      label,
+      value: maskSensitiveFieldValue(id, value),
+    }))
 }
 
 export type PacketLabels = {
@@ -149,7 +178,7 @@ export function buildRegistrationPacket(input: {
 
   const sections: PdfSection[] = []
 
-  const idRows = rowsFromRecord(idFields, locale)
+  const idRows = idFrontRowsForPdf(idFields, locale)
   if (idRows.length > 0) {
     sections.push({
       title: `${labels.applicantSection} — ${labels.idSubsection}`,
@@ -204,6 +233,60 @@ export function buildRegistrationPacket(input: {
       rows: [],
     })
   }
+
+  const ref = `MU-SPL-${Date.now().toString().slice(-8)}`
+  const submittedAt = new Date().toLocaleDateString(
+    locale === "hr" ? "hr-HR" : locale === "de" ? "de-DE" : locale === "it" ? "it-IT" : "en-GB",
+    { day: "2-digit", month: "2-digit", year: "numeric" }
+  )
+
+  return {
+    processTitle: guide.title,
+    referenceNumber: ref,
+    submittedAt,
+    sections,
+    footer: labels.footer,
+    locale,
+  }
+}
+
+/** Full registration packet from ID + vehicle paper scans (car flow step 3). */
+export function buildVehicleRegistrationPacket(input: {
+  guide: ProcessGuide
+  locale: Locale
+  labels: PacketLabels
+}): RegistrationPacketPdfInput {
+  const { guide, locale, labels } = input
+  const idFields = loadDemoExtracted()?.fields ?? {}
+  const vehicleFields = loadVehiclePaperExtracted()?.fields ?? {}
+  const sections: PdfSection[] = []
+
+  const idRows = idFrontRowsForPdf(idFields, locale)
+  if (idRows.length > 0) {
+    sections.push({
+      title: `${labels.applicantSection} — ${labels.idSubsection}`,
+      rows: idRows,
+    })
+  }
+
+  const vehicleRows = rowsFromRecord(vehicleFields, locale)
+  if (vehicleRows.length > 0) {
+    sections.push({
+      title: labels.vehicleSection,
+      subtitle: guide.title,
+      rows: vehicleRows,
+    })
+  }
+
+  const attachmentItems = [
+    labels.idSubsection,
+    ...(vehicleRows.length > 0 ? [labels.vehicleSection] : []),
+  ]
+  sections.push({
+    title: labels.attachmentsSection,
+    checklist: attachmentItems,
+    rows: [],
+  })
 
   const ref = `MU-SPL-${Date.now().toString().slice(-8)}`
   const submittedAt = new Date().toLocaleDateString(

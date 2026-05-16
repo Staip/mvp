@@ -11,7 +11,6 @@ export function valueForQuestion(
   if (/full.?name|ime i prezime|vollständig|nome completo/.test(label)) {
     return fields.fullName
   }
-  if (/oib|personal id/.test(label)) return fields.oib
   if (
     /id card number|broj osobne|ausweisnummer|document number|broj iskaznic/.test(
       label
@@ -19,11 +18,11 @@ export function valueForQuestion(
   ) {
     return fields.idCardNumber
   }
-  if (/address|adresa|adresse|indirizzo|prebivalište|wohn/.test(label)) {
-    return fields.address
-  }
   if (/birth|rođen|geburt|nascita/.test(label)) {
     return fields.dateOfBirth
+  }
+  if (/nationalit|državljan|staatsangeh|cittadin/.test(label)) {
+    return fields.nationality
   }
   return undefined
 }

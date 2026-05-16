@@ -28,7 +28,7 @@ export type ProcessStep = {
   openingHours?: string
   /** Office slot length in minutes — defined per process step, not chosen by user */
   appointmentDurationMinutes?: number
-  uploadVariant?: "id_card_two_sided"
+  uploadVariant?: "id_card_two_sided" | "vehicle_papers"
   /** Form + supporting document photo in one step */
   requiresAttachmentUpload?: boolean
 }

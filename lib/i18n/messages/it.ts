@@ -176,6 +176,17 @@ export const it: Messages = {
       idExtracted: "Campi rilevati",
       idContinueBack: "Ora scansiona il retro",
       idComplete: "ID verificato — moduli compilati automaticamente",
+      vehicleExtracted: "Dati veicolo rilevati",
+      vehicleComplete: "Documenti veicolo scansionati — passo successivo",
+      vehiclePdfIntro:
+        "I dati di ID e veicolo sono nel pacchetto ufficiale. Anteprima qui, poi stampa per l'appuntamento.",
+      previewRegistrationPdf: "Anteprima PDF",
+      printRegistrationPdf: "Stampa PDF",
+      pdfPreviewTitle: "Anteprima domanda di registrazione",
+      closePdfPreview: "Chiudi",
+      vehiclePdfReady: "PDF controllato — completa il passo e prenota la visita.",
+      completeVehicleScansFirst:
+        "Completa prima la scansione ID (passo 1) e i documenti veicolo (passo 2).",
       idRetake: "Ripeti foto",
       autofillFromId: "Compilato automaticamente dalla scansione ID",
       downloadPdf: "Scarica domanda PDF",

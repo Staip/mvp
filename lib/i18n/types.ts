@@ -134,6 +134,15 @@ export type Messages = {
       idExtracted: string
       idContinueBack: string
       idComplete: string
+      vehicleExtracted: string
+      vehicleComplete: string
+      vehiclePdfIntro: string
+      previewRegistrationPdf: string
+      printRegistrationPdf: string
+      pdfPreviewTitle: string
+      closePdfPreview: string
+      vehiclePdfReady: string
+      completeVehicleScansFirst: string
       idRetake: string
       autofillFromId: string
       downloadPdf: string

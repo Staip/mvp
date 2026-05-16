@@ -177,6 +177,17 @@ export const en: Messages = {
       idExtracted: "Fields detected",
       idContinueBack: "Now scan the back side",
       idComplete: "ID verified — forms below will auto-fill",
+      vehicleExtracted: "Vehicle data detected",
+      vehicleComplete: "Vehicle papers scanned — continue to the next step",
+      vehiclePdfIntro:
+        "Your ID and vehicle data are compiled into an official registration packet. Preview it here, then print for your appointment.",
+      previewRegistrationPdf: "Preview PDF",
+      printRegistrationPdf: "Print PDF",
+      pdfPreviewTitle: "Registration packet preview",
+      closePdfPreview: "Close",
+      vehiclePdfReady: "PDF reviewed — you can complete this step and book your visit.",
+      completeVehicleScansFirst:
+        "Complete the ID scan (step 1) and vehicle papers (step 2) first.",
       idRetake: "Retake photo",
       autofillFromId: "Auto-filled from your ID scan",
       downloadPdf: "Download PDF application",
