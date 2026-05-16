@@ -30,8 +30,6 @@ function readStoredLocale(): Locale {
   if (typeof window === "undefined") return DEFAULT_LOCALE
   const stored = localStorage.getItem(LOCALE_STORAGE_KEY)
   if (stored && isLocale(stored)) return stored
-  const browser = navigator.language.slice(0, 2)
-  if (isLocale(browser)) return browser
   return DEFAULT_LOCALE
 }
 
