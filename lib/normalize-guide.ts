@@ -1,5 +1,6 @@
 import type { Locale } from "@/lib/i18n"
-import { prependIdScanStep } from "@/lib/id-scan-step"
+import { mergeDocumentQuestions } from "@/lib/document-step-questions"
+import { isIdScanStep, prependIdScanStep } from "@/lib/id-scan-step"
 import type {
   ProcessDocument,
   ProcessGuide,
@@ -37,32 +38,6 @@ const DEFAULT_LOCATIONS: Record<Locale, ProcessStepLocation[]> = {
     { name: "Città di Spalato – Servizi ai cittadini", address: "Obala hrvatskog narodnog preporoda 1, 21000 Split" },
     { name: "Polizia Spalato", address: "Gundulićeva 23, 21000 Split" },
     { name: "Camera di Commercio – Spalato", address: "Ulica Antuna Mihanovića 1, Split" },
-  ],
-}
-
-const DEFAULT_QUESTIONS: Record<
-  Locale,
-  (docName: string) => StepQuestion[]
-> = {
-  en: () => [
-    { id: "fullName", label: "Your full name", placeholder: "e.g. Ana Horvat" },
-    { id: "oib", label: "OIB (personal ID number)", placeholder: "11 digits" },
-    { id: "address", label: "Your address in Split", placeholder: "Street and city" },
-  ],
-  hr: () => [
-    { id: "fullName", label: "Ime i prezime", placeholder: "npr. Ana Horvat" },
-    { id: "oib", label: "OIB", placeholder: "11 znamenki" },
-    { id: "address", label: "Adresa u Splitu", placeholder: "Ulica i grad" },
-  ],
-  de: () => [
-    { id: "fullName", label: "Vollständiger Name", placeholder: "z. B. Ana Horvat" },
-    { id: "oib", label: "OIB", placeholder: "11 Ziffern" },
-    { id: "address", label: "Adresse in Split", placeholder: "Straße und Ort" },
-  ],
-  it: () => [
-    { id: "fullName", label: "Nome completo", placeholder: "es. Ana Horvat" },
-    { id: "oib", label: "OIB", placeholder: "11 cifre" },
-    { id: "address", label: "Indirizzo a Spalato", placeholder: "Via e città" },
   ],
 }
 
@@ -176,8 +151,34 @@ function buildStep(
     ...base,
     kind: "document",
     document: doc,
-    questions: legacy?.questions ?? DEFAULT_QUESTIONS[locale](doc.name),
+    questions: mergeDocumentQuestions(legacy?.questions, locale),
   }
+}
+
+/** Combine “fill form” document steps with the following upload step. */
+function mergeFormWithUpload(steps: ProcessStep[]): ProcessStep[] {
+  const out: ProcessStep[] = []
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i]
+    const next = steps[i + 1]
+    if (
+      step.kind === "document" &&
+      !isIdScanStep(step) &&
+      next?.kind === "upload" &&
+      !isIdScanStep(next)
+    ) {
+      out.push({
+        ...step,
+        requiresAttachmentUpload: true,
+        uploadHint: next.uploadHint ?? step.uploadHint,
+        document: step.document ?? next.document,
+      })
+      i++
+      continue
+    }
+    out.push(step)
+  }
+  return out
 }
 
 export type GuideInput = {
@@ -233,6 +234,7 @@ export function normalizeProcessGuide(
     )
   })
 
+  const merged = mergeFormWithUpload(steps)
   const { documents: _d, locations: _l, ...rest } = guide
-  return prependIdScanStep({ ...rest, steps }, locale)
+  return prependIdScanStep({ ...rest, steps: merged }, locale)
 }

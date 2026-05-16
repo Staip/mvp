@@ -1,8 +1,9 @@
 "use client"
 
 import { useRef, useState } from "react"
-import { Camera, Download, Loader2, Sparkles } from "lucide-react"
+import { Camera, Download, Sparkles } from "lucide-react"
 
+import { IdScanOverlay } from "@/components/demo/id-scan-overlay"
 import { HelpChatButton } from "@/components/contextual-help/help-chat-button"
 import { useLocale } from "@/components/locale-provider"
 import { Button } from "@/components/ui/button"
@@ -15,6 +16,12 @@ import {
 import { downloadRegistrationPacket } from "@/lib/download-pdf"
 import type { Messages } from "@/lib/i18n"
 import type { ProcessGuide, ProcessStep } from "@/lib/types"
+
+const MIN_SCAN_MS = 2400
+
+function delay(ms: number) {
+  return new Promise((r) => setTimeout(r, ms))
+}
 
 type StepUploadPanelProps = {
   processId: string
@@ -33,12 +40,27 @@ export function StepUploadPanel({
   const { locale } = useLocale()
   const inputRef = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [scanning, setScanning] = useState(false)
   const [generatingPdf, setGeneratingPdf] = useState(false)
   const [fields, setFields] = useState<Record<string, string> | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const doc = step.document!
+
+  async function extractFromImage(dataUrl: string) {
+    const res = await fetch("/api/extract-image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        image: dataUrl,
+        documentName: doc.name,
+        locale,
+      }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error ?? labels.uploadFailed)
+    return data.fields ?? {}
+  }
 
   async function handleFile(file: File) {
     if (!file.type.startsWith("image/")) {
@@ -46,32 +68,29 @@ export function StepUploadPanel({
       return
     }
     setError(null)
+    setFields(null)
+
     const reader = new FileReader()
-    reader.onload = async () => {
-      const dataUrl = reader.result as string
-      setPreview(dataUrl)
-      setLoading(true)
-      setFields(null)
-      try {
-        const res = await fetch("/api/extract-image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            image: dataUrl,
-            documentName: doc.name,
-            locale,
-          }),
-        })
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error ?? labels.uploadFailed)
-        const extracted = data.fields ?? {}
-        setFields(extracted)
-        saveUploadSnapshot(processId, snapshotFromUploadStep(step, extracted))
-      } catch (e) {
-        setError(e instanceof Error ? e.message : labels.uploadFailed)
-      } finally {
-        setLoading(false)
-      }
+    reader.onload = () => {
+      void (async () => {
+        const dataUrl = reader.result as string
+        setPreview(dataUrl)
+        setScanning(true)
+        try {
+          const [extracted] = await Promise.all([
+            extractFromImage(dataUrl),
+            delay(MIN_SCAN_MS),
+          ])
+          setFields(extracted)
+          saveUploadSnapshot(processId, snapshotFromUploadStep(step, extracted))
+        } catch (e) {
+          setError(e instanceof Error ? e.message : labels.uploadFailed)
+          setPreview(null)
+          if (inputRef.current) inputRef.current.value = ""
+        } finally {
+          setScanning(false)
+        }
+      })()
     }
     reader.readAsDataURL(file)
   }
@@ -125,37 +144,35 @@ export function StepUploadPanel({
           variant="outline"
           className="h-auto w-full flex-col gap-2 py-8"
           onClick={() => inputRef.current?.click()}
+          disabled={scanning}
         >
           <Camera className="size-8 text-primary" />
           <span>{labels.uploadPhoto}</span>
         </Button>
       ) : (
-        <div className="space-y-3">
+        <div className="relative overflow-hidden rounded-lg border-2 border-primary/30">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={preview}
             alt=""
-            className="max-h-40 w-full rounded-lg border object-contain"
+            className="max-h-44 w-full bg-black/5 object-contain"
           />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setPreview(null)
-              setFields(null)
-              if (inputRef.current) inputRef.current.value = ""
-            }}
-          >
-            {labels.uploadAgain}
-          </Button>
-        </div>
-      )}
-
-      {loading && (
-        <div className="text-muted-foreground flex items-center justify-center gap-2 py-4 text-sm">
-          <Loader2 className="size-4 animate-spin" />
-          {labels.uploadAnalyzing}
+          {scanning && <IdScanOverlay scanningLabel={labels.idScanning} />}
+          {!scanning && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="absolute right-2 bottom-2"
+              onClick={() => {
+                setPreview(null)
+                setFields(null)
+                if (inputRef.current) inputRef.current.value = ""
+              }}
+            >
+              {labels.uploadAgain}
+            </Button>
+          )}
         </div>
       )}
 
@@ -165,7 +182,7 @@ export function StepUploadPanel({
         </p>
       )}
 
-      {fields && !loading && (
+      {fields && !scanning && (
         <div className="space-y-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
           <p className="flex items-center gap-2 text-sm font-medium">
             <Sparkles className="size-4 text-primary" />

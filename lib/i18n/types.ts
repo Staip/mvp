@@ -103,6 +103,7 @@ export type Messages = {
         visit: string
       }
       questionsIntro: string
+      documentUploadInStep: string
       generateDocument: string
       downloadDocument: string
       downloadFooter: string

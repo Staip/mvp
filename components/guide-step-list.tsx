@@ -50,9 +50,7 @@ export function GuideStepList({
     return idx === -1 ? guide.steps.length : idx
   }, [guide.steps, checked])
 
-  const [activeStepId, setActiveStepId] = useState<string | null>(
-    () => guide.steps[0]?.id ?? null
-  )
+  const [activeStepId, setActiveStepId] = useState<string | null>(null)
   const [, setScanTick] = useState(0)
   const onIdScanUpdate = useCallback(() => setScanTick((n) => n + 1), [])
 
@@ -97,6 +95,7 @@ export function GuideStepList({
         return (
           <StepDocumentPanel
             processId={processId}
+            guide={guide}
             step={step}
             labels={labels}
             processTitle={guide.title}

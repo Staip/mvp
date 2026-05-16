@@ -59,7 +59,7 @@ export const hr: Messages = {
     heroSubtitle:
       "Opišite što vam treba jednostavnim jezikom. AI u sekundama izrađuje korake, dokumente, troškove i lokacije ureda.",
     whatDoYouNeed: "Što trebate riješiti?",
-    placeholder: 'npr. "Želim registrirati auto u Splitu"',
+    placeholder: 'npr. "Trebam prijaviti privremeni boravak u Splitu"',
     voice: {
       start: "Govori",
       stop: "Stop",
@@ -112,7 +112,7 @@ export const hr: Messages = {
     },
     errors: {
       tooShort:
-        "Opišite što vam treba — npr. registracija auta ili otvaranje obrta.",
+        "Opišite što vam treba — npr. boravišna dozvola ili prijava prebivališta.",
       generic: "Nešto je pošlo po krivu.",
       generationFailed: "Generiranje nije uspjelo",
     },
@@ -143,7 +143,10 @@ export const hr: Messages = {
         upload: "Fotografija",
         visit: "Posjet uredu",
       },
-      questionsIntro: "Odgovorite na dva kratka pitanja — izradit ćemo dokument za preuzimanje.",
+      questionsIntro:
+        "Odgovorite na kratka pitanja — izradit ćemo dokument za preuzimanje.",
+      documentUploadInStep:
+        "Učitajte fotografiju popunjenog obrasca ili priloga",
       generateDocument: "Izradi dokument",
       downloadDocument: "Preuzmi dokument",
       downloadFooter: "Generirao SplitFlow (demo). Ponesite originale u ured.",

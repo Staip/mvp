@@ -59,7 +59,7 @@ export const it: Messages = {
     heroSubtitle:
       "Descrivi cosa ti serve in parole semplici. L'IA crea in pochi secondi passi, documenti, costi e sedi degli uffici.",
     whatDoYouNeed: "Cosa devi fare?",
-    placeholder: 'es. "Voglio immatricolare un\'auto a Spalato"',
+    placeholder: 'es. "Devo registrare il soggiorno temporaneo a Spalato"',
     voice: {
       start: "Parla",
       stop: "Stop",
@@ -144,6 +144,8 @@ export const it: Messages = {
         visit: "Visita in ufficio",
       },
       questionsIntro: "Due domande brevi — creiamo il documento da scaricare.",
+      documentUploadInStep:
+        "Carica una foto del modulo compilato o del documento di supporto",
       generateDocument: "Crea documento",
       downloadDocument: "Scarica documento",
       downloadFooter: "Generato da SplitFlow (demo). Porta gli originali in ufficio.",

@@ -59,7 +59,7 @@ export const de: Messages = {
     heroSubtitle:
       "Beschreiben Sie Ihr Anliegen in einfachen Worten. Die KI erstellt in Sekunden Schritte, Dokumente, Kosten und Behördenstandorte.",
     whatDoYouNeed: "Was möchten Sie erledigen?",
-    placeholder: 'z. B. „Ich möchte ein Auto in Split anmelden"',
+    placeholder: 'z. B. „Ich möchte meinen Aufenthalt in Split anmelden"',
     voice: {
       start: "Sprechen",
       stop: "Stopp",
@@ -143,7 +143,10 @@ export const de: Messages = {
         upload: "Foto",
         visit: "Amtsbesuch",
       },
-      questionsIntro: "Zwei kurze Fragen — wir erstellen Ihr Dokument zum Download.",
+      questionsIntro:
+        "Zwei kurze Fragen — wir erstellen Ihr Dokument zum Download.",
+      documentUploadInStep:
+        "Foto des ausgefüllten Formulars oder Belegs hochladen",
       generateDocument: "Dokument erstellen",
       downloadDocument: "Dokument herunterladen",
       downloadFooter: "Erstellt von SplitFlow (Demo). Originale mitbringen.",

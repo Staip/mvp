@@ -1,24 +1,41 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Download, FileText, Sparkles } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { Camera, Download, FileText, Sparkles } from "lucide-react"
 
+import { IdScanOverlay } from "@/components/demo/id-scan-overlay"
 import {
   FieldLabelWithHelp,
   HelpChatButton,
 } from "@/components/contextual-help/help-chat-button"
+import { useLocale } from "@/components/locale-provider"
 import { Button } from "@/components/ui/button"
-import { saveDocumentSnapshot } from "@/lib/application-data-storage"
+import {
+  saveDocumentSnapshot,
+  saveUploadSnapshot,
+} from "@/lib/application-data-storage"
+import {
+  buildRegistrationPacket,
+  snapshotFromUploadStep,
+} from "@/lib/build-registration-packet"
+import { isAutofillableQuestion } from "@/lib/document-step-questions"
 import { downloadTextDocument } from "@/lib/download-document"
-import { downloadApplicationPdf } from "@/lib/download-pdf"
+import { downloadApplicationPdf, downloadRegistrationPacket } from "@/lib/download-pdf"
 import { loadDemoExtracted } from "@/lib/demo/demo-storage"
 import { valueForQuestion } from "@/lib/map-extracted-fields"
 import type { Messages } from "@/lib/i18n"
-import type { ProcessStep } from "@/lib/types"
+import type { ProcessGuide, ProcessStep } from "@/lib/types"
 import { cn } from "@/lib/utils"
+
+const MIN_SCAN_MS = 2400
+
+function delay(ms: number) {
+  return new Promise((r) => setTimeout(r, ms))
+}
 
 type StepDocumentPanelProps = {
   processId: string
+  guide: ProcessGuide
   step: ProcessStep
   labels: Messages["copilot"]["guide"]
   processTitle: string
@@ -26,27 +43,42 @@ type StepDocumentPanelProps = {
 
 export function StepDocumentPanel({
   processId,
+  guide,
   step,
   labels,
   processTitle,
 }: StepDocumentPanelProps) {
+  const { locale } = useLocale()
   const questions = step.questions ?? []
   const doc = step.document!
+  const needsUpload = !!step.requiresAttachmentUpload
   const extracted = loadDemoExtracted()?.fields ?? {}
   const hasIdData = Object.keys(extracted).length > 0
 
+  const uploadInputRef = useRef<HTMLInputElement>(null)
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [highlighted, setHighlighted] = useState<Record<string, boolean>>({})
   const [autofillDone, setAutofillDone] = useState(false)
   const [generated, setGenerated] = useState(false)
   const [generatingPdf, setGeneratingPdf] = useState(false)
 
+  const [uploadPreview, setUploadPreview] = useState<string | null>(null)
+  const [scanning, setScanning] = useState(false)
+  const [uploadFields, setUploadFields] = useState<Record<string, string> | null>(
+    null
+  )
+  const [uploadError, setUploadError] = useState<string | null>(null)
+
   useEffect(() => {
     if (!hasIdData) return
 
     const keys = questions
+      .filter(
+        (q) =>
+          isAutofillableQuestion(q) &&
+          Boolean(valueForQuestion(q, extracted)?.trim())
+      )
       .map((q) => q.id)
-      .filter((id) => valueForQuestion(questions.find((q) => q.id === id)!, extracted))
 
     let i = 0
     const run = () => {
@@ -81,6 +113,60 @@ export function StepDocumentPanel({
     })
   }, [answers, processId, step, doc.name, questions])
 
+  async function extractFromImage(dataUrl: string) {
+    const res = await fetch("/api/extract-image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        image: dataUrl,
+        documentName: doc.name,
+        locale,
+      }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error ?? labels.uploadFailed)
+    return data.fields ?? {}
+  }
+
+  async function handleUploadFile(file: File) {
+    if (!file.type.startsWith("image/")) {
+      setUploadError(labels.uploadInvalid)
+      return
+    }
+    setUploadError(null)
+    setUploadFields(null)
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      void (async () => {
+        const dataUrl = reader.result as string
+        setUploadPreview(dataUrl)
+        setScanning(true)
+        try {
+          const [fields] = await Promise.all([
+            extractFromImage(dataUrl),
+            delay(MIN_SCAN_MS),
+          ])
+          setUploadFields(fields)
+          saveUploadSnapshot(
+            processId,
+            snapshotFromUploadStep(
+              { ...step, kind: "upload", document: doc },
+              fields
+            )
+          )
+        } catch (e) {
+          setUploadError(e instanceof Error ? e.message : labels.uploadFailed)
+          setUploadPreview(null)
+          if (uploadInputRef.current) uploadInputRef.current.value = ""
+        } finally {
+          setScanning(false)
+        }
+      })()
+    }
+    reader.readAsDataURL(file)
+  }
+
   function downloadTxt() {
     const lines = [
       `SPLITFLOW — ${processTitle}`,
@@ -98,23 +184,45 @@ export function StepDocumentPanel({
 
   function downloadPdf() {
     setGeneratingPdf(true)
-    const rows = questions.map((q) => ({
-      label: q.label,
-      value: answers[q.id] ?? "",
-    }))
-    downloadApplicationPdf(
-      "splitflow-application.pdf",
-      `${processTitle} — ${doc.name}`,
-      rows,
-      labels.downloadFooter
-    )
+    if (needsUpload && uploadFields) {
+      const packet = buildRegistrationPacket({
+        guide,
+        currentStep: { ...step, kind: "upload", document: doc },
+        currentUploadFields: uploadFields,
+        locale,
+        labels: {
+          applicantSection: labels.pdfApplicantSection,
+          vehicleSection: labels.pdfVehicleSection,
+          priorUploadsSection: labels.pdfPriorUploadsSection,
+          attachmentsSection: labels.pdfAttachmentsSection,
+          idSubsection: labels.pdfIdSubsection,
+          footer: labels.downloadFooter,
+        },
+      })
+      downloadRegistrationPacket(packet)
+    } else {
+      const rows = questions.map((q) => ({
+        label: q.label,
+        value: answers[q.id] ?? "",
+      }))
+      downloadApplicationPdf(
+        "splitflow-application.pdf",
+        `${processTitle} — ${doc.name}`,
+        rows,
+        labels.downloadFooter
+      )
+    }
     setTimeout(() => {
       setGeneratingPdf(false)
       setGenerated(true)
     }, 500)
   }
 
-  const canSubmit = questions.every((q) => (answers[q.id] ?? "").trim().length > 0)
+  const questionsComplete = questions.every(
+    (q) => (answers[q.id] ?? "").trim().length > 0
+  )
+  const uploadComplete = !needsUpload || !!uploadFields
+  const canSubmit = questionsComplete && uploadComplete && hasIdData
 
   return (
     <div className="space-y-4">
@@ -177,12 +285,84 @@ export function StepDocumentPanel({
         ))}
       </div>
 
+      {needsUpload && (
+        <div className="space-y-3 border-t border-border/80 pt-4">
+          <p className="text-sm font-medium">{labels.documentUploadInStep}</p>
+          <p className="text-muted-foreground text-xs">
+            {step.uploadHint ?? labels.uploadIntro}
+          </p>
+
+          <input
+            ref={uploadInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="sr-only"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) void handleUploadFile(file)
+            }}
+          />
+
+          {!uploadPreview ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="h-auto w-full flex-col gap-2 border-dashed py-6"
+              disabled={!hasIdData || scanning}
+              onClick={() => uploadInputRef.current?.click()}
+            >
+              <Camera className="size-7 text-primary" />
+              <span className="text-sm">{labels.uploadPhoto}</span>
+            </Button>
+          ) : (
+            <div className="relative overflow-hidden rounded-lg border-2 border-primary/30">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={uploadPreview}
+                alt=""
+                className="max-h-40 w-full object-contain bg-black/5"
+              />
+              {scanning && <IdScanOverlay scanningLabel={labels.idScanning} />}
+              {!scanning && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="absolute right-2 bottom-2"
+                  onClick={() => {
+                    setUploadPreview(null)
+                    setUploadFields(null)
+                    if (uploadInputRef.current) uploadInputRef.current.value = ""
+                  }}
+                >
+                  {labels.uploadAgain}
+                </Button>
+              )}
+            </div>
+          )}
+
+          {uploadError && (
+            <p className="text-destructive text-sm" role="alert">
+              {uploadError}
+            </p>
+          )}
+
+          {uploadFields && !scanning && (
+            <p className="flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-300">
+              <Sparkles className="size-3.5" />
+              {labels.extractedFields}
+            </p>
+          )}
+        </div>
+      )}
+
       {!generated ? (
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button
             type="button"
             className="flex-1 gap-2"
-            disabled={!canSubmit || !hasIdData || generatingPdf}
+            disabled={!canSubmit || generatingPdf}
             onClick={downloadPdf}
           >
             {generatingPdf ? (
@@ -190,27 +370,29 @@ export function StepDocumentPanel({
             ) : (
               <>
                 <Download className="size-4" />
-                {labels.downloadPdf}
+                {needsUpload ? labels.downloadPackagePdf : labels.downloadPdf}
               </>
             )}
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="flex-1"
-            disabled={!canSubmit || !hasIdData}
-            onClick={() => {
-              downloadTxt()
-              setGenerated(true)
-            }}
-          >
-            {labels.generateDocument}
-          </Button>
+          {!needsUpload && (
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              disabled={!canSubmit}
+              onClick={() => {
+                downloadTxt()
+                setGenerated(true)
+              }}
+            >
+              {labels.generateDocument}
+            </Button>
+          )}
         </div>
       ) : (
         <Button type="button" className="w-full gap-2" onClick={downloadPdf}>
           <Download className="size-4" />
-          {labels.downloadPdf}
+          {needsUpload ? labels.downloadPackagePdf : labels.downloadPdf}
         </Button>
       )}
     </div>
