@@ -77,6 +77,8 @@ export function GuideStepList({
         }
         return (
           <StepUploadPanel
+            processId={processId}
+            guide={guide}
             step={step}
             labels={labels}
             processTitle={guide.title}
@@ -94,6 +96,7 @@ export function GuideStepList({
       default:
         return (
           <StepDocumentPanel
+            processId={processId}
             step={step}
             labels={labels}
             processTitle={guide.title}

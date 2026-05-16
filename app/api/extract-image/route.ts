@@ -1,10 +1,31 @@
 import { NextResponse } from "next/server"
-import { getDemoFallbackFields } from "@/lib/demo/demo-fields"
-import { LOCALE_AI_NAMES, getMessages, isLocale } from "@/lib/i18n"
+import {
+  getDemoFallbackFields,
+  getVehicleDemoFallback,
+} from "@/lib/demo/demo-fields"
+import { LOCALE_AI_NAMES, isLocale } from "@/lib/i18n"
 import type { Locale } from "@/lib/i18n"
 
-function schemaForSide(side: "front" | "back" | undefined) {
-  if (side === "back") {
+type ExtractMode = "id_front" | "id_back" | "vehicle"
+
+function isVehicleDocument(name: string) {
+  return /insurance|osigur|technical|pregled|vehicle|vozil|registration|promet|invoice|račun|racun|car|auto|vin|homolog|polic|certifikat|potvrda/i.test(
+    name
+  )
+}
+
+function resolveMode(
+  side: "front" | "back" | undefined,
+  documentName: string
+): ExtractMode {
+  if (side === "back") return "id_back"
+  if (side === "front") return "id_front"
+  if (isVehicleDocument(documentName)) return "vehicle"
+  return "id_front"
+}
+
+function schemaForMode(mode: ExtractMode) {
+  if (mode === "id_back") {
     return {
       type: "object",
       properties: {
@@ -15,6 +36,36 @@ function schemaForSide(side: "front" | "back" | undefined) {
         issuedBy: { type: "string" },
       },
       required: ["oib", "address", "issueDate", "expiryDate", "issuedBy"],
+      additionalProperties: false,
+    }
+  }
+  if (mode === "vehicle") {
+    return {
+      type: "object",
+      properties: {
+        vin: { type: "string" },
+        make: { type: "string" },
+        model: { type: "string" },
+        year: { type: "string" },
+        color: { type: "string" },
+        registrationNumber: { type: "string" },
+        engineNumber: { type: "string" },
+        fuelType: { type: "string" },
+        insurancePolicy: { type: "string" },
+        insuranceValidUntil: { type: "string" },
+      },
+      required: [
+        "vin",
+        "make",
+        "model",
+        "year",
+        "color",
+        "registrationNumber",
+        "engineNumber",
+        "fuelType",
+        "insurancePolicy",
+        "insuranceValidUntil",
+      ],
       additionalProperties: false,
     }
   }
@@ -31,46 +82,55 @@ function schemaForSide(side: "front" | "back" | undefined) {
   }
 }
 
-function pickSideFields(
-  raw: Record<string, unknown>,
-  side: "front" | "back" | undefined
-): Record<string, string> {
-  const frontKeys = [
-    "fullName",
-    "dateOfBirth",
-    "idCardNumber",
-    "nationality",
-  ] as const
-  const backKeys = [
-    "oib",
-    "address",
-    "issueDate",
-    "expiryDate",
-    "issuedBy",
-  ] as const
-  const keys =
-    side === "back" ? backKeys : side === "front" ? frontKeys : [...frontKeys, ...backKeys]
+const MODE_KEYS: Record<ExtractMode, readonly string[]> = {
+  id_front: ["fullName", "dateOfBirth", "idCardNumber", "nationality"],
+  id_back: ["oib", "address", "issueDate", "expiryDate", "issuedBy"],
+  vehicle: [
+    "vin",
+    "make",
+    "model",
+    "year",
+    "color",
+    "registrationNumber",
+    "engineNumber",
+    "fuelType",
+    "insurancePolicy",
+    "insuranceValidUntil",
+  ],
+}
 
+function pickFields(
+  raw: Record<string, unknown>,
+  mode: ExtractMode
+): Record<string, string> {
   const out: Record<string, string> = {}
-  for (const key of keys) {
+  for (const key of MODE_KEYS[mode]) {
     const v = raw[key]
     if (typeof v === "string" && v.trim()) out[key] = v.trim()
   }
   return out
 }
 
-function mergeWithFallback(
-  fields: Record<string, string>,
-  side: "front" | "back" | undefined,
-  locale: Locale
-): Record<string, string> {
-  const fallback = getDemoFallbackFields(side ?? "front", locale)
-  return { ...fallback, ...fields }
+function fallbackForMode(mode: ExtractMode, locale: Locale) {
+  if (mode === "vehicle") return getVehicleDemoFallback(locale)
+  if (mode === "id_back") return getDemoFallbackFields("back", locale)
+  return getDemoFallbackFields("front", locale)
+}
+
+function systemPrompt(mode: ExtractMode, lang: string, documentName: string) {
+  if (mode === "vehicle") {
+    return `You extract text from vehicle-related documents (registration card, insurance policy, technical inspection) for Croatian administration in Split. Document: ${documentName}. Return JSON with visible fields only; empty string if missing. Language context: ${lang}. Keys: vin, make, model, year, color, registrationNumber, engineNumber, fuelType, insurancePolicy, insuranceValidUntil.`
+  }
+  if (mode === "id_back") {
+    return `You extract text from Croatian osobna iskaznica BACK side. ${lang}. Keys: oib (11-digit on back), address, issueDate, expiryDate, issuedBy.`
+  }
+  return `You extract text from Croatian osobna iskaznica FRONT side. ${lang}. Keys: fullName, dateOfBirth, idCardNumber (NOT OIB), nationality.`
 }
 
 export async function POST(req: Request) {
   let locale: Locale = "en"
   let side: "front" | "back" | undefined
+  let mode: ExtractMode = "id_front"
 
   try {
     const body = await req.json()
@@ -80,6 +140,7 @@ export async function POST(req: Request) {
       typeof body.documentName === "string" ? body.documentName : "Document"
     side =
       body.side === "front" || body.side === "back" ? body.side : undefined
+    mode = resolveMode(side, documentName)
 
     if (typeof body.locale === "string" && isLocale(body.locale)) {
       locale = body.locale
@@ -94,9 +155,7 @@ export async function POST(req: Request) {
 
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) {
-      return NextResponse.json({
-        fields: getDemoFallbackFields(side ?? "front", locale),
-      })
+      return NextResponse.json({ fields: fallbackForMode(mode, locale) })
     }
 
     const lang = LOCALE_AI_NAMES[locale]
@@ -111,7 +170,7 @@ export async function POST(req: Request) {
         messages: [
           {
             role: "system",
-            content: `You extract text from Croatian osobna iskaznica (ID card) photos for administration in Split. Side: ${side ?? "unknown"}. Return JSON with only visible fields. Use empty string for missing keys. Labels/context in ${lang}. FRONT only: fullName, dateOfBirth, idCardNumber (document number on front — NOT OIB), nationality. BACK only: oib (11-digit personal ID on back), address, issueDate, expiryDate, issuedBy.`,
+            content: systemPrompt(mode, lang, documentName),
           },
           {
             role: "user",
@@ -129,7 +188,7 @@ export async function POST(req: Request) {
           json_schema: {
             name: "extracted_fields",
             strict: true,
-            schema: schemaForSide(side),
+            schema: schemaForMode(mode),
           },
         },
         max_tokens: 500,
@@ -140,7 +199,7 @@ export async function POST(req: Request) {
       const errText = await res.text()
       console.error("[extract-image] OpenAI error:", res.status, errText)
       return NextResponse.json({
-        fields: getDemoFallbackFields(side ?? "front", locale),
+        fields: fallbackForMode(mode, locale),
         fallback: true,
       })
     }
@@ -149,7 +208,7 @@ export async function POST(req: Request) {
     const content = data.choices?.[0]?.message?.content
     if (!content) {
       return NextResponse.json({
-        fields: getDemoFallbackFields(side ?? "front", locale),
+        fields: fallbackForMode(mode, locale),
         fallback: true,
       })
     }
@@ -160,17 +219,20 @@ export async function POST(req: Request) {
     } catch {
       console.error("[extract-image] Invalid JSON from model:", content)
       return NextResponse.json({
-        fields: getDemoFallbackFields(side ?? "front", locale),
+        fields: fallbackForMode(mode, locale),
         fallback: true,
       })
     }
 
-    const fields = mergeWithFallback(pickSideFields(parsed, side), side, locale)
+    const fields = {
+      ...fallbackForMode(mode, locale),
+      ...pickFields(parsed, mode),
+    }
     return NextResponse.json({ fields })
   } catch (e) {
     console.error("[extract-image]", e)
     return NextResponse.json({
-      fields: getDemoFallbackFields(side ?? "front", locale),
+      fields: fallbackForMode(mode, locale),
       fallback: true,
     })
   }

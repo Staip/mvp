@@ -140,3 +140,24 @@ export function getDemoFallbackFields(
 export function fieldLabel(def: DemoFieldDef, locale: Locale) {
   return def.label[locale]
 }
+
+export function getVehicleDemoFallback(locale: Locale): Record<string, string> {
+  const colors: Record<Locale, string> = {
+    en: "Grey metallic",
+    hr: "Siva metalik",
+    de: "Grau metallic",
+    it: "Grigio metallizzato",
+  }
+  return {
+    vin: "WF0XXXGCDX1234567",
+    make: "Volkswagen",
+    model: "Golf 1.6 TDI",
+    year: "2019",
+    color: colors[locale],
+    registrationNumber: "ST-1234-AB",
+    engineNumber: "CAYC123456",
+    fuelType: locale === "hr" ? "Dizel" : "Diesel",
+    insurancePolicy: "HR-OS-2026-88421",
+    insuranceValidUntil: "31.12.2026.",
+  }
+}

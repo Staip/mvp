@@ -29,6 +29,10 @@ import { HelpChatButton } from "@/components/contextual-help/help-chat-button"
 import { GuideStepList } from "@/components/guide-step-list"
 import { useUserData } from "@/components/user-data-provider"
 import { VoiceInputButton } from "@/components/voice-input-button"
+import {
+  clearApplicationData,
+  setApplicationProcessId,
+} from "@/lib/application-data-storage"
 import { clearDemoExtracted } from "@/lib/demo/demo-storage"
 import { normalizeProcessGuide } from "@/lib/normalize-guide"
 import type { ProcessGuide } from "@/lib/types"
@@ -76,6 +80,7 @@ export function BureaucracyCopilot() {
     const saved = processes.find((p) => p.id === resumeProcessId)
     if (saved) {
       setProcessId(saved.id)
+      setApplicationProcessId(saved.id)
       setRequest(saved.request)
       setGuide(saved.guide)
       setChecked(saved.checked)
@@ -104,6 +109,7 @@ export function BureaucracyCopilot() {
     }
 
     clearDemoExtracted()
+    clearApplicationData()
     setError(null)
     setRequest(q)
     setPhase("loading")
@@ -129,6 +135,7 @@ export function BureaucracyCopilot() {
         locale,
       })
       setProcessId(id)
+      setApplicationProcessId(id)
       setGuide(normalized)
       setPhase("guide")
     } catch (e) {
@@ -139,6 +146,7 @@ export function BureaucracyCopilot() {
 
   const reset = useCallback(() => {
     clearDemoExtracted()
+    clearApplicationData()
     setPhase("input")
     setGuide(null)
     setChecked({})

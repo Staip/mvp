@@ -6,25 +6,35 @@ import { Camera, Download, Loader2, Sparkles } from "lucide-react"
 import { HelpChatButton } from "@/components/contextual-help/help-chat-button"
 import { useLocale } from "@/components/locale-provider"
 import { Button } from "@/components/ui/button"
-import { downloadTextDocument } from "@/lib/download-document"
+import { saveUploadSnapshot } from "@/lib/application-data-storage"
+import {
+  buildRegistrationPacket,
+  labelForField,
+  snapshotFromUploadStep,
+} from "@/lib/build-registration-packet"
+import { downloadRegistrationPacket } from "@/lib/download-pdf"
 import type { Messages } from "@/lib/i18n"
-import type { ProcessStep } from "@/lib/types"
+import type { ProcessGuide, ProcessStep } from "@/lib/types"
 
 type StepUploadPanelProps = {
+  processId: string
+  guide: ProcessGuide
   step: ProcessStep
   labels: Messages["copilot"]["guide"]
   processTitle: string
 }
 
 export function StepUploadPanel({
+  processId,
+  guide,
   step,
   labels,
-  processTitle,
 }: StepUploadPanelProps) {
   const { locale } = useLocale()
   const inputRef = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [generatingPdf, setGeneratingPdf] = useState(false)
   const [fields, setFields] = useState<Record<string, string> | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -54,7 +64,9 @@ export function StepUploadPanel({
         })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error ?? labels.uploadFailed)
-        setFields(data.fields ?? {})
+        const extracted = data.fields ?? {}
+        setFields(extracted)
+        saveUploadSnapshot(processId, snapshotFromUploadStep(step, extracted))
       } catch (e) {
         setError(e instanceof Error ? e.message : labels.uploadFailed)
       } finally {
@@ -64,17 +76,26 @@ export function StepUploadPanel({
     reader.readAsDataURL(file)
   }
 
-  function downloadPrefilled() {
+  function downloadPacket() {
     if (!fields) return
-    const lines = [
-      `SPLITFLOW — ${processTitle}`,
-      `Prefilled from photo: ${doc.name}`,
-      "",
-      ...Object.entries(fields).map(([k, v]) => `${k}: ${v}`),
-      "",
-      labels.downloadFooter,
-    ]
-    downloadTextDocument("prefilled-document.txt", lines)
+    setGeneratingPdf(true)
+    saveUploadSnapshot(processId, snapshotFromUploadStep(step, fields))
+    const packet = buildRegistrationPacket({
+      guide,
+      currentStep: step,
+      currentUploadFields: fields,
+      locale,
+      labels: {
+        applicantSection: labels.pdfApplicantSection,
+        vehicleSection: labels.pdfVehicleSection,
+        priorUploadsSection: labels.pdfPriorUploadsSection,
+        attachmentsSection: labels.pdfAttachmentsSection,
+        idSubsection: labels.pdfIdSubsection,
+        footer: labels.downloadFooter,
+      },
+    })
+    downloadRegistrationPacket(packet)
+    setTimeout(() => setGeneratingPdf(false), 600)
   }
 
   return (
@@ -152,15 +173,31 @@ export function StepUploadPanel({
           </p>
           <dl className="space-y-2 text-sm">
             {Object.entries(fields).map(([key, value]) => (
-              <div key={key} className="flex justify-between gap-2 border-b border-border/50 pb-2 last:border-0">
-                <dt className="text-muted-foreground capitalize">{key}</dt>
+              <div
+                key={key}
+                className="flex justify-between gap-2 border-b border-border/50 pb-2 last:border-0"
+              >
+                <dt className="text-muted-foreground">
+                  {labelForField(key, locale)}
+                </dt>
                 <dd className="text-right font-medium">{value}</dd>
               </div>
             ))}
           </dl>
-          <Button type="button" className="w-full gap-2" onClick={downloadPrefilled}>
-            <Download className="size-4" />
-            {labels.downloadDocument}
+          <Button
+            type="button"
+            className="w-full gap-2"
+            disabled={generatingPdf}
+            onClick={downloadPacket}
+          >
+            {generatingPdf ? (
+              <span className="animate-pulse">{labels.generatingPdf}</span>
+            ) : (
+              <>
+                <Download className="size-4" />
+                {labels.downloadPackagePdf}
+              </>
+            )}
           </Button>
         </div>
       )}

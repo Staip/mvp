@@ -8,6 +8,7 @@ import {
   HelpChatButton,
 } from "@/components/contextual-help/help-chat-button"
 import { Button } from "@/components/ui/button"
+import { saveDocumentSnapshot } from "@/lib/application-data-storage"
 import { downloadTextDocument } from "@/lib/download-document"
 import { downloadApplicationPdf } from "@/lib/download-pdf"
 import { loadDemoExtracted } from "@/lib/demo/demo-storage"
@@ -17,12 +18,14 @@ import type { ProcessStep } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 type StepDocumentPanelProps = {
+  processId: string
   step: ProcessStep
   labels: Messages["copilot"]["guide"]
   processTitle: string
 }
 
 export function StepDocumentPanel({
+  processId,
   step,
   labels,
   processTitle,
@@ -64,6 +67,19 @@ export function StepDocumentPanel({
     return () => clearTimeout(t)
   // eslint-disable-next-line react-hooks/exhaustive-deps -- run once when panel opens with ID data
   }, [hasIdData, questions.length])
+
+  useEffect(() => {
+    if (!processId || questions.length === 0) return
+    const hasAny = questions.some((q) => (answers[q.id] ?? "").trim())
+    if (!hasAny) return
+    saveDocumentSnapshot(processId, {
+      stepId: step.id,
+      stepTitle: step.title,
+      documentName: doc.name,
+      questions: questions.map((q) => ({ id: q.id, label: q.label })),
+      answers,
+    })
+  }, [answers, processId, step, doc.name, questions])
 
   function downloadTxt() {
     const lines = [

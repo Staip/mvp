@@ -137,6 +137,12 @@ export type Messages = {
       autofillFromId: string
       downloadPdf: string
       generatingPdf: string
+      downloadPackagePdf: string
+      pdfApplicantSection: string
+      pdfVehicleSection: string
+      pdfPriorUploadsSection: string
+      pdfAttachmentsSection: string
+      pdfIdSubsection: string
       completeIdScanFirst: string
     }
   }
