@@ -34,8 +34,14 @@ import {
   setApplicationProcessId,
 } from "@/lib/application-data-storage"
 import { clearDemoExtracted } from "@/lib/demo/demo-storage"
-import { normalizeProcessGuide } from "@/lib/normalize-guide"
+import { detectGuideScenario } from "@/lib/i18n/mock-guides"
 import type { ProcessGuide } from "@/lib/types"
+
+const VEHICLE_LOADING_MIN_MS = 2800
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
 
 type Phase = "input" | "loading" | "guide"
 
@@ -55,17 +61,22 @@ export function BureaucracyCopilot() {
   const [processId, setProcessId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loadingIndex, setLoadingIndex] = useState(0)
+  const [loadingVehicle, setLoadingVehicle] = useState(false)
 
-  const loadingMessage = t.copilot.loading.messages[loadingIndex]
+  const loadingCopy = loadingVehicle
+    ? t.copilot.loadingVehicle
+    : t.copilot.loading
+  const loadingMessage =
+    loadingCopy.messages[loadingIndex % loadingCopy.messages.length]
 
   useEffect(() => {
     if (phase !== "loading") return
     setLoadingIndex(0)
     const interval = setInterval(() => {
-      setLoadingIndex((i) => (i + 1) % t.copilot.loading.messages.length)
-    }, 1800)
+      setLoadingIndex((i) => (i + 1) % loadingCopy.messages.length)
+    }, 900)
     return () => clearInterval(interval)
-  }, [phase, t.copilot.loading.messages])
+  }, [phase, loadingCopy.messages])
 
   const progress = useMemo(() => {
     if (!guide?.steps.length) return 0
@@ -112,34 +123,40 @@ export function BureaucracyCopilot() {
     clearApplicationData()
     setError(null)
     setRequest(q)
+    const isCarRegistration = detectGuideScenario(q) === "car"
+    setLoadingVehicle(isCarRegistration)
     setPhase("loading")
     setChecked({})
     setProcessId(null)
 
     try {
-      const res = await fetch("/api/generate", {
+      const fetchGuide = fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ request: q, locale }),
       })
+      const [res] = await Promise.all([
+        fetchGuide,
+        isCarRegistration ? delay(VEHICLE_LOADING_MIN_MS) : Promise.resolve(),
+      ])
       const data = await res.json()
       if (!res.ok) {
         throw new Error(data.error ?? t.copilot.errors.generationFailed)
       }
 
-      const normalized = normalizeProcessGuide(data.guide, locale)
       const id = saveProcess({
         request: q,
-        guide: normalized,
+        guide: data.guide,
         checked: {},
         locale,
       })
       setProcessId(id)
       setApplicationProcessId(id)
-      setGuide(normalized)
+      setGuide(data.guide)
       setPhase("guide")
     } catch (e) {
       setError(e instanceof Error ? e.message : t.copilot.errors.generic)
+      setLoadingVehicle(false)
       setPhase("input")
     }
   }
@@ -152,6 +169,7 @@ export function BureaucracyCopilot() {
     setChecked({})
     setProcessId(null)
     setError(null)
+    setLoadingVehicle(false)
   }, [])
 
   useRegisterCopilotHome(reset)
@@ -164,8 +182,10 @@ export function BureaucracyCopilot() {
           <Sparkles className="absolute -right-1 -top-1 size-5 text-primary" />
         </div>
         <div>
-          <p className="text-lg font-semibold">{t.copilot.loading.title}</p>
-          <p className="text-muted-foreground mt-2 text-sm">{loadingMessage}</p>
+          <p className="text-lg font-semibold">{loadingCopy.title}</p>
+          <p className="text-muted-foreground mt-2 min-h-[1.25rem] text-sm transition-opacity duration-300">
+            {loadingMessage}
+          </p>
         </div>
       </div>
     )

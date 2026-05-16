@@ -1,60 +1,14 @@
 import { NextResponse } from "next/server"
 import { LOCALE_AI_NAMES, getMessages, isLocale } from "@/lib/i18n"
-import { getMockProcessGuide } from "@/lib/i18n/mock-guides"
+import {
+  detectGuideScenario,
+  getMockProcessGuide,
+} from "@/lib/i18n/mock-guides"
 import { normalizeProcessGuide } from "@/lib/normalize-guide"
 import type { Locale } from "@/lib/i18n"
 import type { ProcessGuide } from "@/lib/types"
 
-const stepSchema = {
-  type: "object",
-  properties: {
-    id: { type: "string" },
-    title: { type: "string" },
-    description: { type: "string" },
-    kind: { type: "string", enum: ["document", "upload", "visit"] },
-    document: {
-      type: "object",
-      properties: {
-        name: { type: "string" },
-        note: { type: "string" },
-      },
-      required: ["name", "note"],
-      additionalProperties: false,
-    },
-    questions: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          id: { type: "string" },
-          label: { type: "string" },
-          placeholder: { type: "string" },
-        },
-        required: ["id", "label", "placeholder"],
-        additionalProperties: false,
-      },
-    },
-    uploadHint: { type: "string" },
-    location: {
-      type: "object",
-      properties: {
-        name: { type: "string" },
-        address: { type: "string" },
-      },
-      required: ["name", "address"],
-      additionalProperties: false,
-    },
-    openingHours: { type: "string" },
-    appointmentDurationMinutes: {
-      type: "number",
-      description:
-        "For visit steps only: slot length in minutes (15, 30, or 45) based on how long this appointment type takes at the office.",
-    },
-  },
-  required: ["id", "title", "description", "kind"],
-  additionalProperties: false,
-} as const
-
+/** Minimal schema — normalize-guide fills documents, locations, and questions. */
 const JSON_SCHEMA = {
   type: "object",
   properties: {
@@ -62,7 +16,21 @@ const JSON_SCHEMA = {
     summary: { type: "string" },
     estimatedDuration: { type: "string" },
     estimatedCost: { type: "string" },
-    steps: { type: "array", items: stepSchema },
+    steps: {
+      type: "array",
+      maxItems: 4,
+      items: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          title: { type: "string" },
+          description: { type: "string" },
+          kind: { type: "string", enum: ["document", "upload", "visit"] },
+        },
+        required: ["id", "title", "description", "kind"],
+        additionalProperties: false,
+      },
+    },
   },
   required: [
     "title",
@@ -76,15 +44,10 @@ const JSON_SCHEMA = {
 
 function systemPrompt(locale: Locale): string {
   const lang = LOCALE_AI_NAMES[locale]
-  return `You are SplitFlow, an AI bureaucracy copilot for Split, Croatia.
-The app ALWAYS prepends a mandatory ID card scan as step 1 ("Scan your ID card") — never add any step about scanning, photographing, or uploading an ID card, osobna iskaznica, or identity document.
-For vehicle / car registration / prometna dozvola / vozilo processes, the app builds a fixed 4-step flow: (1) ID scan, (2) vehicle papers upload, (3) PDF create/print preview, (4) office visit booking at Police Administration Split — do not add any other steps for these processes.
-Create the remaining steps (3–5 steps). Each step has exactly ONE kind:
-- "document": user fills a form (questions: fullName, dateOfBirth, idCardNumber, nationality + contactPhone, contactEmail). The app may attach a photo upload in the same step — do NOT add a separate upload step immediately after a document/form step. Do not use oib or address fields.
-- "upload": user uploads ONE photo of a specific document (not ID, not right after a form document step). Include document {name, note} and uploadHint.
-- "visit": user visits ONE office with booking. Include location {name, address}, openingHours, and appointmentDurationMinutes (15 quick, 30 standard, 45 complex).
-End with a visit step when the user must submit in person. Use real Split offices. Write ALL text in ${lang}.
-Respond ONLY with valid JSON matching the schema.`
+  return `SplitFlow — bureaucracy guide for Split, Croatia. Language: ${lang}.
+Return JSON only. ID scan is automatic (never add ID upload steps).
+Exactly 3 steps: mix document/upload, end with kind "visit". Short titles (≤8 words) and one-sentence descriptions.
+Do not include questions, locations, or nested objects — only id, title, description, kind per step.`
 }
 
 async function generateWithOpenAI(
@@ -112,11 +75,12 @@ async function generateWithOpenAI(
         type: "json_schema",
         json_schema: {
           name: "process_guide",
-          strict: false,
+          strict: true,
           schema: JSON_SCHEMA,
         },
       },
-      temperature: 0.4,
+      temperature: 0.2,
+      max_tokens: 700,
     }),
   })
 
@@ -154,17 +118,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: msg.requestTooLong }, { status: 400 })
     }
 
+    const scenario = detectGuideScenario(request)
     let guide: ProcessGuide
-    let source: "ai" | "mock" = "ai"
+    let source: "ai" | "mock" | "template" = "ai"
 
-    try {
-      guide = await generateWithOpenAI(request, locale)
-    } catch {
+    if (scenario === "car" || scenario === "business") {
       guide = getMockProcessGuide(request, locale)
-      source = "mock"
+      source = "template"
+    } else {
+      try {
+        guide = await generateWithOpenAI(request, locale)
+        guide = normalizeProcessGuide(guide, locale)
+      } catch {
+        guide = getMockProcessGuide(request, locale)
+        source = "mock"
+      }
+      return NextResponse.json({ guide, source })
     }
-
-    guide = normalizeProcessGuide(guide, locale)
 
     return NextResponse.json({ guide, source })
   } catch {

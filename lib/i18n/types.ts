@@ -85,6 +85,10 @@ export type Messages = {
       title: string
       messages: [string, string, string]
     }
+    loadingVehicle: {
+      title: string
+      messages: string[]
+    }
     guide: {
       newRequest: string
       aiBadge: string

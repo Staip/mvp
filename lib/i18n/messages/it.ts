@@ -124,6 +124,15 @@ export const it: Messages = {
         "Preparazione della checklist personalizzata…",
       ],
     },
+    loadingVehicle: {
+      title: "Preparazione guida immatricolazione auto",
+      messages: [
+        "Verifica requisiti della Polizia…",
+        "Creazione checklist documenti…",
+        "Aggiunta passaggi di registrazione…",
+        "Preparazione PDF e appuntamento…",
+      ],
+    },
     guide: {
       newRequest: "Nuova richiesta",
       aiBadge: "Guida generata dall'IA",

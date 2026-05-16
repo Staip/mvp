@@ -124,6 +124,15 @@ export const en: Messages = {
         "Preparing your personalized checklist…",
       ],
     },
+    loadingVehicle: {
+      title: "Building your car registration guide",
+      messages: [
+        "Checking Police Administration requirements…",
+        "Creating your document checklist…",
+        "Adding vehicle registration steps…",
+        "Preparing PDF and appointment flow…",
+      ],
+    },
     guide: {
       newRequest: "New request",
       aiBadge: "AI-generated guide",

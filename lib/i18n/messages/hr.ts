@@ -124,6 +124,15 @@ export const hr: Messages = {
         "Pripremam personalizirani popis…",
       ],
     },
+    loadingVehicle: {
+      title: "Pripremam vodič za registraciju vozila",
+      messages: [
+        "Provjeravam uvjete Policijske uprave…",
+        "Sastavljam popis potrebnih dokumenata…",
+        "Dodajem korake registracije vozila…",
+        "Pripremam PDF i rezervaciju termina…",
+      ],
+    },
     guide: {
       newRequest: "Novi upit",
       aiBadge: "AI generirani vodič",

@@ -315,10 +315,10 @@ const GENERIC: Record<Locale, (request: string) => MockGuideInput> = {
   }),
 }
 
-function detectScenario(request: string): Scenario {
+export function detectGuideScenario(request: string): Scenario {
   const lower = request.toLowerCase()
   if (
-    /car|auto|vozil|fahrzeug|vehicle|registr.*auto|immatricol|anmeld.*auto/.test(
+    /car|auto|vozil|fahrzeug|vehicle|prometna|registr.*vozil|registr.*auto|immatricol|anmeld.*auto/.test(
       lower
     ) &&
     !/business|obrt|café|cafe|unternehmen|impresa|kafić|gewerbe/.test(lower)
@@ -339,7 +339,7 @@ export function getMockProcessGuide(
   request: string,
   locale: Locale
 ): ProcessGuide {
-  const scenario = detectScenario(request)
+  const scenario = detectGuideScenario(request)
   let raw: MockGuideInput
   if (scenario === "car") raw = CAR[locale]
   else if (scenario === "business") raw = BUSINESS[locale]

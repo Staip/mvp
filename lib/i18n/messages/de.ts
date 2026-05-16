@@ -124,6 +124,15 @@ export const de: Messages = {
         "Personalisierte Checkliste wird vorbereitet…",
       ],
     },
+    loadingVehicle: {
+      title: "Fahrzeuganmeldung wird vorbereitet",
+      messages: [
+        "Anforderungen der Polizeiverwaltung werden geprüft…",
+        "Dokumenten-Checkliste wird erstellt…",
+        "Schritte zur Fahrzeugzulassung werden hinzugefügt…",
+        "PDF- und Terminablauf werden vorbereitet…",
+      ],
+    },
     guide: {
       newRequest: "Neue Anfrage",
       aiBadge: "KI-generierter Leitfaden",
