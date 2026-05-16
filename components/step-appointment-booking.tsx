@@ -1,8 +1,13 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { CalendarClock, CheckCircle2 } from "lucide-react"
+import { CalendarClock, CheckCircle2, Clock } from "lucide-react"
 
+import {
+  FieldLabelWithHelp,
+  HelpChatButton,
+} from "@/components/contextual-help/help-chat-button"
+import { useUserData } from "@/components/user-data-provider"
 import { Button } from "@/components/ui/button"
 import {
   formatDateInputValue,
@@ -10,23 +15,61 @@ import {
   getTimeSlots,
 } from "@/lib/appointment-slots"
 import type { Messages } from "@/lib/i18n"
+import type { ProcessStep } from "@/lib/types"
 
 type StepAppointmentBookingProps = {
+  step: ProcessStep
   labels: Messages["copilot"]["guide"]
   stepId: string
+  processId: string
+  processTitle: string
+  stepTitle: string
+  officeName: string
+  officeAddress: string
+  durationMinutes: number
 }
 
 export function StepAppointmentBooking({
+  step,
   labels,
   stepId,
+  processId,
+  processTitle,
+  stepTitle,
+  officeName,
+  officeAddress,
+  durationMinutes,
 }: StepAppointmentBookingProps) {
+  const { addAppointment } = useUserData()
   const weekdays = useMemo(() => getNextWeekdays(10), [])
   const [date, setDate] = useState(() => formatDateInputValue(weekdays[0]))
-  const [interval, setInterval] = useState<15 | 30>(30)
   const [time, setTime] = useState("")
   const [confirmed, setConfirmed] = useState(false)
 
-  const slots = useMemo(() => getTimeSlots(interval), [interval])
+  const slots = useMemo(
+    () => getTimeSlots(durationMinutes),
+    [durationMinutes]
+  )
+
+  const durationLabel = labels.slotDuration.replace(
+    "{minutes}",
+    String(durationMinutes)
+  )
+
+  function confirm() {
+    if (!date || !time) return
+    addAppointment({
+      processId,
+      processTitle,
+      stepTitle,
+      officeName,
+      officeAddress,
+      date,
+      time,
+      intervalMinutes: durationMinutes,
+    })
+    setConfirmed(true)
+  }
 
   if (confirmed) {
     return (
@@ -41,16 +84,31 @@ export function StepAppointmentBooking({
 
   return (
     <div className="space-y-3 rounded-lg border border-dashed border-primary/30 bg-primary/5 p-3">
-      <p className="flex items-center gap-2 text-sm font-medium">
-        <CalendarClock className="size-4 text-primary" />
-        {labels.bookAppointment}
+      <div className="flex items-center justify-between gap-2">
+        <p className="flex items-center gap-2 text-sm font-medium">
+          <CalendarClock className="size-4 text-primary" />
+          {labels.bookAppointment}
+        </p>
+        <HelpChatButton
+          scope="booking_step"
+          step={step}
+          booking={{ durationMinutes, officeName }}
+        />
+      </div>
+
+      <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
+        <Clock className="size-3.5 shrink-0" />
+        {durationLabel}
       </p>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="space-y-1.5">
-          <span className="text-muted-foreground text-xs font-medium">
-            {labels.selectDate}
-          </span>
+        <FieldLabelWithHelp
+          label={labels.selectDate}
+          labelClassName="text-muted-foreground text-xs"
+          scope="booking_date"
+          step={step}
+          booking={{ durationMinutes, officeName }}
+        >
           <input
             type="date"
             value={date}
@@ -62,12 +120,15 @@ export function StepAppointmentBooking({
             }}
             className="border-input bg-background focus-visible:ring-ring/50 h-9 w-full rounded-lg border px-3 text-sm focus-visible:ring-3 focus-visible:outline-none"
           />
-        </label>
+        </FieldLabelWithHelp>
 
-        <label className="space-y-1.5">
-          <span className="text-muted-foreground text-xs font-medium">
-            {labels.selectTime}
-          </span>
+        <FieldLabelWithHelp
+          label={labels.selectTime}
+          labelClassName="text-muted-foreground text-xs"
+          scope="booking_time"
+          step={step}
+          booking={{ durationMinutes, officeName }}
+        >
           <select
             value={time}
             onChange={(e) => setTime(e.target.value)}
@@ -80,33 +141,7 @@ export function StepAppointmentBooking({
               </option>
             ))}
           </select>
-        </label>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-muted-foreground text-xs">Interval:</span>
-        <Button
-          type="button"
-          size="xs"
-          variant={interval === 15 ? "default" : "outline"}
-          onClick={() => {
-            setInterval(15)
-            setTime("")
-          }}
-        >
-          {labels.interval15}
-        </Button>
-        <Button
-          type="button"
-          size="xs"
-          variant={interval === 30 ? "default" : "outline"}
-          onClick={() => {
-            setInterval(30)
-            setTime("")
-          }}
-        >
-          {labels.interval30}
-        </Button>
+        </FieldLabelWithHelp>
       </div>
 
       <Button
@@ -114,7 +149,7 @@ export function StepAppointmentBooking({
         size="sm"
         className="w-full sm:w-auto"
         disabled={!date || !time}
-        onClick={() => setConfirmed(true)}
+        onClick={confirm}
       >
         {labels.confirmBooking}
       </Button>

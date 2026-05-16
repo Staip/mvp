@@ -1,33 +1,46 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import {
   CheckCircle2,
   ChevronDown,
-  Clock,
-  FileText,
   Lock,
+  Camera,
+  FileText,
   MapPin,
 } from "lucide-react"
 
-import { StepAppointmentBooking } from "@/components/step-appointment-booking"
+import { HelpChatButton } from "@/components/contextual-help/help-chat-button"
+import { StepDocumentPanel } from "@/components/step-document-panel"
+import { StepUploadPanel } from "@/components/step-upload-panel"
+import { StepVisitPanel } from "@/components/step-visit-panel"
 import { Button } from "@/components/ui/button"
 import type { Messages } from "@/lib/i18n"
-import type { ProcessGuide, ProcessStep } from "@/lib/types"
+import type { ProcessGuide, ProcessStep, StepKind } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 type GuideStepListProps = {
+  processId: string
   guide: ProcessGuide
   labels: Messages["copilot"]["guide"]
   checked: Record<string, boolean>
   onCheckedChange: (stepId: string, value: boolean) => void
+  onStepCompleted?: (step: ProcessStep) => void
+}
+
+const KIND_ICON: Record<StepKind, typeof FileText> = {
+  document: FileText,
+  upload: Camera,
+  visit: MapPin,
 }
 
 export function GuideStepList({
+  processId,
   guide,
   labels,
   checked,
   onCheckedChange,
+  onStepCompleted,
 }: GuideStepListProps) {
   const currentStepIndex = useMemo(() => {
     const idx = guide.steps.findIndex((s) => !checked[s.id])
@@ -36,18 +49,40 @@ export function GuideStepList({
 
   const [activeStepId, setActiveStepId] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (currentStepIndex < guide.steps.length) {
-      setActiveStepId(guide.steps[currentStepIndex].id)
-    } else {
-      setActiveStepId(null)
-    }
-  }, [currentStepIndex, guide.steps])
-
-  function completeStep(step: ProcessStep, index: number) {
+  function completeStep(step: ProcessStep) {
     onCheckedChange(step.id, true)
-    const next = guide.steps[index + 1]
-    setActiveStepId(next?.id ?? null)
+    onStepCompleted?.(step)
+    setActiveStepId(null)
+  }
+
+  function renderStepPanel(step: ProcessStep) {
+    switch (step.kind) {
+      case "upload":
+        return (
+          <StepUploadPanel
+            step={step}
+            labels={labels}
+            processTitle={guide.title}
+          />
+        )
+      case "visit":
+        return (
+          <StepVisitPanel
+            step={step}
+            labels={labels}
+            processId={processId}
+            processTitle={guide.title}
+          />
+        )
+      default:
+        return (
+          <StepDocumentPanel
+            step={step}
+            labels={labels}
+            processTitle={guide.title}
+          />
+        )
+    }
   }
 
   return (
@@ -57,6 +92,7 @@ export function GuideStepList({
         const isCurrent = index === currentStepIndex && !isCompleted
         const isLocked = index > currentStepIndex
         const isActive = isCurrent && activeStepId === step.id
+        const KindIcon = KIND_ICON[step.kind]
 
         if (isCompleted) {
           return (
@@ -92,8 +128,8 @@ export function GuideStepList({
               aria-disabled
             >
               <div className="flex gap-3">
-                <div className="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
-                  {index + 1}
+                <div className="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-full">
+                  <KindIcon className="size-4" aria-hidden />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-muted-foreground flex items-center gap-1.5 text-xs font-medium">
@@ -130,12 +166,12 @@ export function GuideStepList({
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex gap-3">
-                  <div className="bg-primary text-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold">
-                    {index + 1}
+                  <div className="bg-primary text-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-full">
+                    <KindIcon className="size-4" aria-hidden />
                   </div>
                   <div>
                     <p className="text-primary text-xs font-semibold uppercase tracking-wide">
-                      {labels.stepCurrent}
+                      {labels.stepCurrent} · {labels.stepKind[step.kind]}
                     </p>
                     <p className="mt-0.5 font-medium leading-snug">
                       {step.title}
@@ -143,6 +179,11 @@ export function GuideStepList({
                     <p className="text-muted-foreground mt-1 text-sm leading-relaxed">
                       {step.description}
                     </p>
+                    {!isActive && (
+                      <span className="text-primary mt-2 inline-block text-xs font-medium">
+                        {labels.openStep} →
+                      </span>
+                    )}
                   </div>
                 </div>
                 <ChevronDown
@@ -156,66 +197,16 @@ export function GuideStepList({
 
             {isActive && (
               <div className="space-y-4 border-t border-border/80 bg-muted/20 px-3 py-4 sm:px-4">
-                <section>
-                  <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold">
-                    <FileText className="size-4" />
-                    {labels.documentsForStep}
-                  </h3>
-                  <ul className="space-y-2">
-                    {step.documents.map((doc) => (
-                      <li
-                        key={doc.name}
-                        className="flex items-start justify-between gap-2 rounded-lg border border-dashed bg-background p-3"
-                      >
-                        <div>
-                          <p className="text-sm font-medium">{doc.name}</p>
-                          <p className="text-muted-foreground text-xs">
-                            {doc.note}
-                          </p>
-                        </div>
-                        <Button variant="outline" size="xs" disabled>
-                          {labels.view}
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-
-                <section className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <h3 className="flex items-center gap-2 text-sm font-semibold">
-                      <MapPin className="size-4" />
-                      {labels.location}
-                    </h3>
-                    <div className="rounded-lg border bg-background p-3">
-                      <p className="text-sm font-medium">{step.location.name}</p>
-                      <p className="text-muted-foreground text-xs">
-                        {step.location.address}
-                      </p>
-                      <p className="text-muted-foreground mt-2 flex items-center gap-1.5 text-xs">
-                        <Clock className="size-3.5" />
-                        {labels.openingHours}: {step.openingHours}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="overflow-hidden rounded-lg border bg-muted/30">
-                    <iframe
-                      title={labels.mapIframeTitle}
-                      className="h-32 w-full border-0 grayscale-30 sm:h-full sm:min-h-32"
-                      loading="lazy"
-                      referrerPolicy="no-referrer-when-downgrade"
-                      src="https://www.openstreetmap.org/export/embed.html?bbox=16.42%2C43.50%2C16.47%2C43.52&layer=mapnik&marker=43.508%2C16.440"
-                    />
-                  </div>
-                </section>
-
-                <StepAppointmentBooking labels={labels} stepId={step.id} />
+                <div className="flex justify-end">
+                  <HelpChatButton scope="step" step={step} />
+                </div>
+                {renderStepPanel(step)}
 
                 <Button
                   type="button"
                   size="lg"
                   className="w-full gap-2 bg-emerald-600 hover:bg-emerald-600/90"
-                  onClick={() => completeStep(step, index)}
+                  onClick={() => completeStep(step)}
                 >
                   <CheckCircle2 className="size-5" />
                   {labels.completeStep}

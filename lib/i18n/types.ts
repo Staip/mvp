@@ -4,10 +4,48 @@ export type Messages = {
   brand: {
     tagline: string
     hackathon: string
+    home: string
   }
   footer: string
+  helpChat: {
+    buttonLabel: string
+    close: string
+    send: string
+    placeholder: string
+    thinking: string
+    error: string
+    contextHint: string
+    titleMain: string
+    titleStep: string
+    titleField: string
+    titleDocument: string
+    titleUpload: string
+    titleVisit: string
+    titleBooking: string
+    titleBookingDate: string
+    titleBookingTime: string
+    titleDefault: string
+    welcomeMain: string
+    welcomeStep: string
+    welcomeField: string
+    welcomeDefault: string
+  }
   language: {
     label: string
+  }
+  hub: {
+    processes: string
+    notifications: string
+    appointments: string
+    processesTitle: string
+    notificationsTitle: string
+    appointmentsTitle: string
+    noOpenProcesses: string
+    noNotifications: string
+    noAppointments: string
+    continue: string
+    completedNote: string
+    markAllRead: string
   }
   copilot: {
     heroTitle: string
@@ -55,15 +93,31 @@ export type Messages = {
       stepCurrent: string
       stepDone: string
       stepLocked: string
+      openStep: string
       completeStep: string
-      documentsForStep: string
+      stepKind: {
+        document: string
+        upload: string
+        visit: string
+      }
+      questionsIntro: string
+      generateDocument: string
+      downloadDocument: string
+      downloadFooter: string
+      uploadIntro: string
+      uploadPhoto: string
+      uploadAgain: string
+      uploadAnalyzing: string
+      uploadInvalid: string
+      uploadFailed: string
+      extractedFields: string
+      visitIntro: string
       location: string
       openingHours: string
       bookAppointment: string
       selectDate: string
       selectTime: string
-      interval15: string
-      interval30: string
+      slotDuration: string
       confirmBooking: string
       bookingConfirmed: string
       bookingDemoNote: string

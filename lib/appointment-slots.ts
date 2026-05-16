@@ -18,10 +18,12 @@ export function formatDateInputValue(date: Date): string {
 }
 
 /** Mock available slots — some marked busy for demo realism */
-export function getTimeSlots(intervalMinutes: 15 | 30): string[] {
+export function getTimeSlots(intervalMinutes: number): string[] {
+  const step =
+    intervalMinutes > 0 && intervalMinutes <= 60 ? intervalMinutes : 30
   const slots: string[] = []
   for (let hour = 8; hour < 16; hour++) {
-    for (let min = 0; min < 60; min += intervalMinutes) {
+    for (let min = 0; min < 60; min += step) {
       const h = String(hour).padStart(2, "0")
       const m = String(min).padStart(2, "0")
       slots.push(`${h}:${m}`)

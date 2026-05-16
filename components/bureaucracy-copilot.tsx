@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   ArrowLeft,
   Clock,
@@ -14,7 +14,6 @@ import {
 import { useLocale } from "@/components/locale-provider"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Progress } from "@/components/ui/progress"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -24,7 +23,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { useRegisterCopilotHome } from "@/components/copilot-home"
+import { GuideHelpProvider } from "@/components/contextual-help/contextual-help-provider"
+import { HelpChatButton } from "@/components/contextual-help/help-chat-button"
 import { GuideStepList } from "@/components/guide-step-list"
+import { useUserData } from "@/components/user-data-provider"
 import { VoiceInputButton } from "@/components/voice-input-button"
 import { normalizeProcessGuide } from "@/lib/normalize-guide"
 import type { ProcessGuide } from "@/lib/types"
@@ -33,10 +36,18 @@ type Phase = "input" | "loading" | "guide"
 
 export function BureaucracyCopilot() {
   const { locale, t } = useLocale()
+  const {
+    saveProcess,
+    resumeProcessId,
+    clearResume,
+    processes,
+    addStepCompletedNotification,
+  } = useUserData()
   const [phase, setPhase] = useState<Phase>("input")
   const [request, setRequest] = useState("")
   const [guide, setGuide] = useState<ProcessGuide | null>(null)
   const [checked, setChecked] = useState<Record<string, boolean>>({})
+  const [processId, setProcessId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loadingIndex, setLoadingIndex] = useState(0)
 
@@ -59,6 +70,31 @@ export function BureaucracyCopilot() {
 
   const allDone = guide ? progress === 100 : false
 
+  useEffect(() => {
+    if (!resumeProcessId) return
+    const saved = processes.find((p) => p.id === resumeProcessId)
+    if (saved) {
+      setProcessId(saved.id)
+      setRequest(saved.request)
+      setGuide(saved.guide)
+      setChecked(saved.checked)
+      setPhase("guide")
+      setError(null)
+    }
+    clearResume()
+  }, [resumeProcessId, processes, clearResume])
+
+  useEffect(() => {
+    if (phase !== "guide" || !guide || !processId) return
+    saveProcess({
+      id: processId,
+      request,
+      guide,
+      checked,
+      locale,
+    })
+  }, [phase, guide, checked, request, locale, processId, saveProcess])
+
   async function handleGenerate(text?: string) {
     const q = (text ?? request).trim()
     if (q.length < 3) {
@@ -70,6 +106,7 @@ export function BureaucracyCopilot() {
     setRequest(q)
     setPhase("loading")
     setChecked({})
+    setProcessId(null)
 
     try {
       const res = await fetch("/api/generate", {
@@ -82,7 +119,15 @@ export function BureaucracyCopilot() {
         throw new Error(data.error ?? t.copilot.errors.generationFailed)
       }
 
-      setGuide(normalizeProcessGuide(data.guide, locale))
+      const normalized = normalizeProcessGuide(data.guide, locale)
+      const id = saveProcess({
+        request: q,
+        guide: normalized,
+        checked: {},
+        locale,
+      })
+      setProcessId(id)
+      setGuide(normalized)
       setPhase("guide")
     } catch (e) {
       setError(e instanceof Error ? e.message : t.copilot.errors.generic)
@@ -90,12 +135,15 @@ export function BureaucracyCopilot() {
     }
   }
 
-  function reset() {
+  const reset = useCallback(() => {
     setPhase("input")
     setGuide(null)
     setChecked({})
+    setProcessId(null)
     setError(null)
-  }
+  }, [])
+
+  useRegisterCopilotHome(reset)
 
   if (phase === "loading") {
     return (
@@ -115,6 +163,12 @@ export function BureaucracyCopilot() {
   if (phase === "guide" && guide) {
     const g = t.copilot.guide
     return (
+      <GuideHelpProvider
+        processTitle={guide.title}
+        processSummary={guide.summary}
+        userRequest={request}
+        guide={guide}
+      >
       <div className="w-full max-w-3xl space-y-6">
         <Button variant="ghost" size="sm" onClick={reset} className="-ml-2 gap-1.5">
           <ArrowLeft className="size-4" />
@@ -169,16 +223,26 @@ export function BureaucracyCopilot() {
           </CardHeader>
           <CardContent>
             <GuideStepList
+              processId={processId ?? ""}
               guide={guide}
               labels={g}
               checked={checked}
               onCheckedChange={(stepId, value) =>
                 setChecked((prev) => ({ ...prev, [stepId]: value }))
               }
+              onStepCompleted={(step) => {
+                if (!processId) return
+                addStepCompletedNotification(
+                  processId,
+                  guide.title,
+                  step.title
+                )
+              }}
             />
           </CardContent>
         </Card>
       </div>
+      </GuideHelpProvider>
     )
   }
 
@@ -194,9 +258,12 @@ export function BureaucracyCopilot() {
         </p>
       </section>
 
-      <p className="text-primary text-center text-sm font-medium tracking-wide uppercase">
-        {t.copilot.whatDoYouNeed}
-      </p>
+      <div className="flex items-center justify-center gap-2">
+        <p className="text-primary text-center text-sm font-medium tracking-wide uppercase">
+          {t.copilot.whatDoYouNeed}
+        </p>
+        <HelpChatButton scope="main_input" />
+      </div>
 
       <Card className="shadow-lg shadow-primary/5">
         <CardContent className="space-y-4 pt-6">

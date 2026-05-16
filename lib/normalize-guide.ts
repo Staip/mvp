@@ -5,6 +5,8 @@ import type {
   ProcessLocation,
   ProcessStep,
   ProcessStepLocation,
+  StepKind,
+  StepQuestion,
 } from "@/lib/types"
 
 const HOURS: Record<Locale, string> = {
@@ -37,18 +39,65 @@ const DEFAULT_LOCATIONS: Record<Locale, ProcessStepLocation[]> = {
   ],
 }
 
-function isEnrichedStep(
-  step: ProcessStep | { id: string; title: string; description: string }
-): step is ProcessStep {
-  return (
-    "documents" in step &&
-    Array.isArray(step.documents) &&
-    step.documents.length > 0 &&
-    "location" in step &&
-    !!step.location?.name &&
-    "openingHours" in step &&
-    !!step.openingHours
-  )
+const DEFAULT_QUESTIONS: Record<
+  Locale,
+  (docName: string) => StepQuestion[]
+> = {
+  en: () => [
+    { id: "fullName", label: "Your full name", placeholder: "e.g. Ana Horvat" },
+    { id: "address", label: "Your address in Split", placeholder: "Street and city" },
+  ],
+  hr: () => [
+    { id: "fullName", label: "Ime i prezime", placeholder: "npr. Ana Horvat" },
+    { id: "address", label: "Adresa u Splitu", placeholder: "Ulica i grad" },
+  ],
+  de: () => [
+    { id: "fullName", label: "Vollständiger Name", placeholder: "z. B. Ana Horvat" },
+    { id: "address", label: "Adresse in Split", placeholder: "Straße und Ort" },
+  ],
+  it: () => [
+    { id: "fullName", label: "Nome completo", placeholder: "es. Ana Horvat" },
+    { id: "address", label: "Indirizzo a Spalato", placeholder: "Via e città" },
+  ],
+}
+
+const UPLOAD_HINTS: Record<Locale, string> = {
+  en: "Take a clear photo of your document or form. AI will read the text and prefill your application.",
+  hr: "Fotografirajte dokument ili obrazac. AI će pročitati tekst i popuniti zahtjev.",
+  de: "Fotografieren Sie Ihr Dokument oder Formular. Die KI liest den Text und füllt den Antrag vor.",
+  it: "Scatta una foto chiara del documento o modulo. L'IA leggerà il testo e compilerà la richiesta.",
+}
+
+function inferVisitDurationMinutes(title: string, description: string): number {
+  const text = `${title} ${description}`.toLowerCase()
+  if (/pay|fee|collect|pick|stamp|preuzm|abhol|potvr/.test(text)) return 15
+  if (/register|permit|license|passport|residen|dozvol|prijav|immatric/.test(text))
+    return 45
+  return 30
+}
+
+function inferKind(title: string, description: string, index: number): StepKind {
+  const text = `${title} ${description}`.toLowerCase()
+  if (
+    /visit|office|counter|polic|ured|šalter|amt|submit|pay.*fee|collect|preuzm|abhol/.test(
+      text
+    )
+  ) {
+    return "visit"
+  }
+  if (
+    /photo|scan|upload|picture|slik|fotograf|bild|insurance|osigur|technical|pregled/.test(
+      text
+    )
+  ) {
+    return "upload"
+  }
+  const rotation: StepKind[] = ["document", "upload", "visit"]
+  return rotation[index % 3]
+}
+
+function hasNewShape(step: ProcessStep | { id: string; title: string; description: string }): step is ProcessStep {
+  return "kind" in step && !!step.kind
 }
 
 function toStepLocation(
@@ -56,26 +105,74 @@ function toStepLocation(
   fallback: ProcessStepLocation
 ): ProcessStepLocation {
   if (!loc) return fallback
-  if ("purpose" in loc) {
-    return { name: loc.name, address: loc.address }
-  }
+  if ("purpose" in loc) return { name: loc.name, address: loc.address }
   return loc
 }
 
-function distributeDocuments(
+function pickDocument(
   docs: ProcessDocument[],
-  stepCount: number,
-  stepIndex: number
-): ProcessDocument[] {
+  stepIndex: number,
+  stepCount: number
+): ProcessDocument {
   if (docs.length === 0) {
-    return [{ name: "Valid ID or passport", note: "Original required" }]
+    return { name: "Application form", note: "Filled via SplitFlow" }
   }
   if (docs.length <= stepCount) {
-    return docs[stepIndex] ? [docs[stepIndex]] : [docs[docs.length - 1]]
+    return docs[stepIndex] ?? docs[docs.length - 1]
   }
-  const perStep = Math.max(1, Math.ceil(docs.length / stepCount))
-  const start = stepIndex * perStep
-  return docs.slice(start, start + perStep)
+  return docs[stepIndex % docs.length]
+}
+
+function buildStep(
+  base: { id: string; title: string; description: string },
+  index: number,
+  locale: Locale,
+  docs: ProcessDocument[],
+  locs: ProcessStepLocation[],
+  fallbacks: ProcessStepLocation[],
+  legacy?: Partial<ProcessStep> & { documents?: ProcessDocument[] }
+): ProcessStep {
+  const kind =
+    legacy?.kind ??
+    inferKind(base.title, base.description, index)
+
+  if (kind === "visit") {
+    const location = toStepLocation(
+      legacy?.location ?? locs[index % locs.length],
+      fallbacks[index % fallbacks.length]
+    )
+    return {
+      ...base,
+      kind: "visit",
+      location,
+      openingHours: legacy?.openingHours ?? HOURS[locale],
+      appointmentDurationMinutes:
+        legacy?.appointmentDurationMinutes ??
+        inferVisitDurationMinutes(base.title, base.description),
+    }
+  }
+
+  if (kind === "upload") {
+    const doc =
+      legacy?.document ??
+      pickDocument(legacy?.documents ?? docs, index, docs.length || 6)
+    return {
+      ...base,
+      kind: "upload",
+      document: doc,
+      uploadHint: legacy?.uploadHint ?? UPLOAD_HINTS[locale],
+    }
+  }
+
+  const doc =
+    legacy?.document ??
+    pickDocument(legacy?.documents ?? docs, index, docs.length || 6)
+  return {
+    ...base,
+    kind: "document",
+    document: doc,
+    questions: legacy?.questions ?? DEFAULT_QUESTIONS[locale](doc.name),
+  }
 }
 
 export type GuideInput = {
@@ -94,42 +191,41 @@ export function normalizeProcessGuide(
   guide: GuideInput,
   locale: Locale = "en"
 ): ProcessGuide {
-  if (guide.steps.length > 0 && isEnrichedStep(guide.steps[0])) {
-    const steps = (guide.steps as ProcessStep[]).map((s) => ({
-      ...s,
-      documents: s.documents?.length ? s.documents : [{ name: "—", note: "" }],
-      location: s.location ?? DEFAULT_LOCATIONS[locale][0],
-      openingHours: s.openingHours || HOURS[locale],
-    }))
-    return { ...guide, steps }
-  }
-
   const docs = guide.documents ?? []
   const locs: ProcessStepLocation[] =
     guide.locations?.map((l) => ({ name: l.name, address: l.address })) ??
     DEFAULT_LOCATIONS[locale]
   const fallbacks = DEFAULT_LOCATIONS[locale]
 
-  const steps: ProcessStep[] = guide.steps.map((step, i) => {
+  const steps = guide.steps.map((step, i) => {
+    if (hasNewShape(step) && step.kind) {
+      return buildStep(
+        { id: step.id, title: step.title, description: step.description },
+        i,
+        locale,
+        docs,
+        locs,
+        fallbacks,
+        step
+      )
+    }
+
     const legacy = step as ProcessStep & {
       documents?: ProcessDocument[]
       location?: ProcessStepLocation
       openingHours?: string
+      kind?: StepKind
     }
 
-    return {
-      id: step.id,
-      title: step.title,
-      description: step.description,
-      documents: legacy.documents?.length
-        ? legacy.documents
-        : distributeDocuments(docs, guide.steps.length, i),
-      location: toStepLocation(
-        legacy.location ?? locs[i % locs.length],
-        fallbacks[i % fallbacks.length]
-      ),
-      openingHours: legacy.openingHours ?? HOURS[locale],
-    }
+    return buildStep(
+      { id: step.id, title: step.title, description: step.description },
+      i,
+      locale,
+      docs,
+      locs,
+      fallbacks,
+      legacy
+    )
   })
 
   const { documents: _d, locations: _l, ...rest } = guide

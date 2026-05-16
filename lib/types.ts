@@ -8,13 +8,26 @@ export type ProcessStepLocation = {
   address: string
 }
 
+export type StepKind = "document" | "upload" | "visit"
+
+export type StepQuestion = {
+  id: string
+  label: string
+  placeholder: string
+}
+
 export type ProcessStep = {
   id: string
   title: string
   description: string
-  documents: ProcessDocument[]
-  location: ProcessStepLocation
-  openingHours: string
+  kind: StepKind
+  document?: ProcessDocument
+  questions?: StepQuestion[]
+  uploadHint?: string
+  location?: ProcessStepLocation
+  openingHours?: string
+  /** Office slot length in minutes — defined per process step, not chosen by user */
+  appointmentDurationMinutes?: number
 }
 
 /** @deprecated Legacy flat location — normalized into steps */

@@ -5,6 +5,56 @@ import { normalizeProcessGuide } from "@/lib/normalize-guide"
 import type { Locale } from "@/lib/i18n"
 import type { ProcessGuide } from "@/lib/types"
 
+const stepSchema = {
+  type: "object",
+  properties: {
+    id: { type: "string" },
+    title: { type: "string" },
+    description: { type: "string" },
+    kind: { type: "string", enum: ["document", "upload", "visit"] },
+    document: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        note: { type: "string" },
+      },
+      required: ["name", "note"],
+      additionalProperties: false,
+    },
+    questions: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          label: { type: "string" },
+          placeholder: { type: "string" },
+        },
+        required: ["id", "label", "placeholder"],
+        additionalProperties: false,
+      },
+    },
+    uploadHint: { type: "string" },
+    location: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        address: { type: "string" },
+      },
+      required: ["name", "address"],
+      additionalProperties: false,
+    },
+    openingHours: { type: "string" },
+    appointmentDurationMinutes: {
+      type: "number",
+      description:
+        "For visit steps only: slot length in minutes (15, 30, or 45) based on how long this appointment type takes at the office.",
+    },
+  },
+  required: ["id", "title", "description", "kind"],
+  additionalProperties: false,
+} as const
+
 const JSON_SCHEMA = {
   type: "object",
   properties: {
@@ -12,48 +62,7 @@ const JSON_SCHEMA = {
     summary: { type: "string" },
     estimatedDuration: { type: "string" },
     estimatedCost: { type: "string" },
-    steps: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          id: { type: "string" },
-          title: { type: "string" },
-          description: { type: "string" },
-          documents: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                name: { type: "string" },
-                note: { type: "string" },
-              },
-              required: ["name", "note"],
-              additionalProperties: false,
-            },
-          },
-          location: {
-            type: "object",
-            properties: {
-              name: { type: "string" },
-              address: { type: "string" },
-            },
-            required: ["name", "address"],
-            additionalProperties: false,
-          },
-          openingHours: { type: "string" },
-        },
-        required: [
-          "id",
-          "title",
-          "description",
-          "documents",
-          "location",
-          "openingHours",
-        ],
-        additionalProperties: false,
-      },
-    },
+    steps: { type: "array", items: stepSchema },
   },
   required: [
     "title",
@@ -68,10 +77,11 @@ const JSON_SCHEMA = {
 function systemPrompt(locale: Locale): string {
   const lang = LOCALE_AI_NAMES[locale]
   return `You are SplitFlow, an AI bureaucracy copilot for Split, Croatia.
-Given a citizen's request, produce an accurate step-by-step guide for Croatian/Split public administration.
-Each step MUST include: title, description, documents needed for THAT step only, location (office name + Split address), and openingHours (e.g. Mon–Fri 08:00–16:00).
-Use real office types (Police Administration, City of Split, HGK, FINA, Tax Administration).
-Write ALL text in ${lang}.
+Create a step-by-step guide. Each step has exactly ONE kind:
+- "document": user answers 2 short questions, we generate one downloadable document. Include document {name, note} and exactly 2 questions.
+- "upload": user uploads ONE photo of a document; AI extracts fields. Include document {name, note} and uploadHint.
+- "visit": user visits ONE office with booking. Include location {name, address}, openingHours, and appointmentDurationMinutes (15 for quick tasks like paying a fee, 30 standard, 45 for registration or permits). No document list.
+Alternate kinds where sensible. Use real Split offices. Write ALL text in ${lang}.
 Respond ONLY with valid JSON matching the schema.`
 }
 
@@ -100,7 +110,7 @@ async function generateWithOpenAI(
         type: "json_schema",
         json_schema: {
           name: "process_guide",
-          strict: true,
+          strict: false,
           schema: JSON_SCHEMA,
         },
       },
